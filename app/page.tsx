@@ -3,6 +3,7 @@
 import { DocumentDropzone } from "@/components/DocumentDropzone";
 import { FileStatus } from "@/components/FileStatus";
 import { ChatBox } from "@/components/ChatBox";
+import { ConfigSection } from "@/components/ConfigSection";
 
 export default function Home() {
   const handleFilesSelected = (files: File[]) => {
@@ -14,10 +15,10 @@ export default function Home() {
       <main className="mx-auto w-full max-w-7xl">
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
-            Document Ingestion
+            Dev Page
           </h1>
           <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-            Upload documents to be processed by the AI system
+            Developer page for testing and development
           </p>
         </div>
 
@@ -31,6 +32,7 @@ export default function Home() {
           {/* Right Column */}
           <div className="space-y-6">
             <ChatBox />
+            <ConfigSection />
           </div>
         </div>
       </main>
