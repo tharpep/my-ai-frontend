@@ -22,8 +22,12 @@ export function ChatBox() {
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messagesContainerRef.current) {
+      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+    }
   };
 
   useEffect(() => {
@@ -82,7 +86,7 @@ export function ChatBox() {
       </div>
 
       <div className="flex h-96 flex-col">
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 ? (
             <p className="text-center text-sm text-zinc-500 dark:text-zinc-400">
               Start a conversation...
@@ -155,7 +159,7 @@ export function ChatBox() {
                   handleSend();
                 }
               }}
-              placeholder="Type a message..."
+              placeholder="Type a message... (Press Enter to send)"
               className="flex-1 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm text-zinc-900 placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder-zinc-400"
               disabled={isLoading}
             />

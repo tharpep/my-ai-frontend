@@ -15,10 +15,6 @@ export function ConfigSection() {
     try {
       const response = await api.getConfig();
       setConfig(response.config);
-      setMessage({
-        type: "success",
-        text: "Configuration reloaded from server",
-      });
     } catch (error) {
       console.error("Failed to load config:", error);
       setMessage({

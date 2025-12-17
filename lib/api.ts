@@ -336,8 +336,13 @@ export interface LogEntry {
 
 /** Get logs response */
 export interface GetLogsResponse {
-  logs: LogEntry[];
-  total: number;
+  object: string;
+  data: LogEntry[];
+  meta: {
+    limit: number;
+    offset: number;
+    count: number;
+  };
   request_id: string;
 }
 
@@ -648,10 +653,13 @@ export const api = {
   // ----- Logs Endpoints -----
 
   /** Get recent request logs */
-  async getLogs(limit?: number): Promise<GetLogsResponse> {
+  async getLogs(limit?: number, offset?: number): Promise<GetLogsResponse> {
     try {
+      const params: any = {};
+      if (limit) params.limit = limit;
+      if (offset) params.offset = offset;
       const response = await apiClient.get<GetLogsResponse>("/v1/logs", {
-        params: limit ? { limit } : {},
+        params,
       });
       return response.data;
     } catch (error) {

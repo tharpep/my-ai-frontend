@@ -8,10 +8,11 @@ export function TerminalOutput() {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [autoScroll, setAutoScroll] = useState(true);
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    if (autoScroll) {
-      logsEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (autoScroll && containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
     }
   };
 
@@ -22,10 +23,11 @@ export function TerminalOutput() {
   const loadLogs = async () => {
     try {
       const response = await api.getLogs(100);
-      setLogs(response.logs);
+      setLogs(response.data || []);
     } catch (error) {
       // Endpoint might not exist yet, silently fail
       console.error("Failed to load logs:", error);
+      // Keep existing logs, don't set to undefined
     }
   };
 
@@ -76,7 +78,7 @@ export function TerminalOutput() {
         <div className="flex items-center gap-2">
           <Terminal className="h-4 w-4 text-green-400" />
           <h3 className="text-sm font-medium text-zinc-300">Request Logs</h3>
-          <span className="text-xs text-zinc-500">({logs.length} entries)</span>
+          <span className="text-xs text-zinc-500">({logs?.length || 0} entries)</span>
         </div>
         <div className="flex items-center gap-2">
           <label className="flex items-center gap-1.5 text-xs text-zinc-400">
@@ -98,8 +100,8 @@ export function TerminalOutput() {
         </div>
       </div>
 
-      <div className="h-64 overflow-y-auto p-3 font-mono text-xs">
-        {logs.length === 0 ? (
+      <div ref={containerRef} className="h-64 overflow-y-auto p-3 font-mono text-xs">
+        {!logs || logs.length === 0 ? (
           <p className="text-zinc-500">
             No logs yet. Logs will appear here when requests are made.
           </p>
