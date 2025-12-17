@@ -2,9 +2,10 @@
 
 import React, { useCallback, useRef, useState, DragEvent, ChangeEvent } from "react";
 import { Upload } from "lucide-react";
+import { api } from "@/lib/api";
 
-/** Accepted file extensions */
-const ACCEPTED_EXTENSIONS = [".pdf", ".txt", ".md", ".json", ".csv"];
+/** Accepted file extensions - matching backend supported types */
+const ACCEPTED_EXTENSIONS = [".pdf", ".txt", ".md", ".docx"];
 
 export interface DocumentDropzoneProps {
   onFilesSelected?: (files: File[]) => void;
@@ -19,6 +20,24 @@ export function DocumentDropzone({
 }: DocumentDropzoneProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const handleFiles = useCallback(
+    async (files: File[]) => {
+      if (files.length === 0) return;
+
+      onFilesSelected?.(files);
+
+      // Upload files
+      for (const file of files) {
+        try {
+          await api.uploadDocument(file);
+        } catch (error) {
+          console.error(`Failed to upload ${file.name}:`, error);
+        }
+      }
+    },
+    [onFilesSelected]
+  );
 
   const handleDragOver = useCallback(
     (e: DragEvent<HTMLDivElement>) => {
@@ -46,22 +65,22 @@ export function DocumentDropzone({
       if (disabled) return;
 
       const files: File[] = Array.from(e.dataTransfer.files);
-      if (files.length > 0 && onFilesSelected) {
-        onFilesSelected(files);
+      if (files.length > 0) {
+        handleFiles(files);
       }
     },
-    [disabled, onFilesSelected]
+    [disabled, handleFiles]
   );
 
   const handleInputChange = useCallback(
     (e: ChangeEvent<HTMLInputElement>) => {
       const files: File[] = e.target.files ? Array.from(e.target.files) : [];
-      if (files.length > 0 && onFilesSelected) {
-        onFilesSelected(files);
+      if (files.length > 0) {
+        handleFiles(files);
       }
       e.target.value = "";
     },
-    [onFilesSelected]
+    [handleFiles]
   );
 
   const openFileDialog = useCallback(() => {
@@ -120,7 +139,7 @@ export function DocumentDropzone({
       </p>
 
       <p className="text-xs text-zinc-400 dark:text-zinc-500">
-        Supports: PDF, TXT, MD, JSON, CSV
+        Supports: PDF, TXT, MD, DOCX
       </p>
 
       <input

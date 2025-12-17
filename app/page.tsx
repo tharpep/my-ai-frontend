@@ -5,7 +5,6 @@ import { DocumentDropzone } from "@/components/DocumentDropzone";
 export default function Home() {
   const handleFilesSelected = (files: File[]) => {
     console.log("Files selected:", files);
-    // TODO: Integrate with upload API when backend endpoint is ready
   };
 
   return (

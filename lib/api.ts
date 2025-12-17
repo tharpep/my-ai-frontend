@@ -89,6 +89,125 @@ export interface StatsResponse {
   [key: string]: unknown;
 }
 
+/** Chat completion message */
+export interface ChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+}
+
+/** Chat completion request */
+export interface ChatCompletionRequest {
+  model?: string;
+  provider?: string;
+  messages: ChatMessage[];
+  temperature?: number;
+  top_p?: number;
+  max_tokens?: number;
+  use_rag?: boolean;
+  rag_top_k?: number;
+  system_prompt?: string;
+  rag_prompt_template?: string;
+}
+
+/** Chat completion response */
+export interface ChatCompletionResponse {
+  id: string;
+  object: string;
+  created: number;
+  model: string;
+  provider: string;
+  choices: Array<{
+    index: number;
+    message: ChatMessage;
+    finish_reason: string;
+  }>;
+  usage: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
+  request_id: string;
+}
+
+/** Embedding request */
+export interface EmbeddingRequest {
+  input: string;
+  model?: string;
+}
+
+/** Embedding response */
+export interface EmbeddingResponse {
+  object: string;
+  data: Array<{
+    object: string;
+    index: number;
+    embedding: number[];
+  }>;
+  model: string;
+  usage: {
+    prompt_tokens: number;
+    total_tokens: number;
+  };
+  request_id: string;
+}
+
+/** Model information */
+export interface ModelInfo {
+  id: string;
+  object: string;
+  owned_by: string;
+  permission: unknown[];
+}
+
+/** Models list response */
+export interface ModelsResponse {
+  object: string;
+  data: ModelInfo[];
+  request_id: string;
+}
+
+/** Upload document response */
+export interface UploadResponse {
+  job_id: string;
+  blob_id: string;
+  filename: string;
+  status: string;
+  request_id: string;
+}
+
+/** Job status response */
+export interface JobStatusResponse {
+  job_id: string;
+  status: string;
+  created_at?: string;
+  completed_at?: string;
+  error?: string;
+  request_id: string;
+}
+
+/** Blob information */
+export interface BlobInfo {
+  blob_id: string;
+  original_filename: string;
+  file_extension: string;
+  size_bytes: number;
+  created_at: string;
+}
+
+/** List blobs response */
+export interface ListBlobsResponse {
+  blobs: BlobInfo[];
+  count: number;
+  request_id: string;
+}
+
+/** Delete blob response */
+export interface DeleteBlobResponse {
+  deleted: boolean;
+  blob_id: string;
+  request_id: string;
+}
+
 // ===== Error Handling =====
 
 /** Typed API error class */
@@ -208,6 +327,104 @@ export const api = {
         "/v1/ingest",
         request ?? {}
       );
+      return response.data;
+    } catch (error) {
+      throw parseError(error as AxiosError<ApiError>);
+    }
+  },
+
+  /** Upload a document for async processing */
+  async uploadDocument(file: File): Promise<UploadResponse> {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await apiClient.post<UploadResponse>(
+        "/v1/ingest/upload",
+        formData,
+        {
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      throw parseError(error as AxiosError<ApiError>);
+    }
+  },
+
+  /** Get job status */
+  async getJobStatus(jobId: string): Promise<JobStatusResponse> {
+    try {
+      const response = await apiClient.get<JobStatusResponse>(
+        `/v1/ingest/jobs/${jobId}`
+      );
+      return response.data;
+    } catch (error) {
+      throw parseError(error as AxiosError<ApiError>);
+    }
+  },
+
+  /** List all blobs */
+  async listBlobs(): Promise<ListBlobsResponse> {
+    try {
+      const response = await apiClient.get<ListBlobsResponse>(
+        "/v1/ingest/blobs"
+      );
+      return response.data;
+    } catch (error) {
+      throw parseError(error as AxiosError<ApiError>);
+    }
+  },
+
+  /** Delete a blob */
+  async deleteBlob(blobId: string): Promise<DeleteBlobResponse> {
+    try {
+      const response = await apiClient.delete<DeleteBlobResponse>(
+        `/v1/ingest/blobs/${blobId}`
+      );
+      return response.data;
+    } catch (error) {
+      throw parseError(error as AxiosError<ApiError>);
+    }
+  },
+
+  // ----- LLM Endpoints -----
+
+  /** Chat completion (OpenAI-compatible) */
+  async chatCompletion(
+    request: ChatCompletionRequest
+  ): Promise<ChatCompletionResponse> {
+    try {
+      const response = await apiClient.post<ChatCompletionResponse>(
+        "/v1/chat/completions",
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw parseError(error as AxiosError<ApiError>);
+    }
+  },
+
+  /** Create embeddings */
+  async createEmbedding(
+    request: EmbeddingRequest
+  ): Promise<EmbeddingResponse> {
+    try {
+      const response = await apiClient.post<EmbeddingResponse>(
+        "/v1/embeddings",
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw parseError(error as AxiosError<ApiError>);
+    }
+  },
+
+  /** List available models */
+  async listModels(): Promise<ModelsResponse> {
+    try {
+      const response = await apiClient.get<ModelsResponse>("/v1/models");
       return response.data;
     } catch (error) {
       throw parseError(error as AxiosError<ApiError>);
