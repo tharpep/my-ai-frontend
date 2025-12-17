@@ -239,6 +239,84 @@ export interface DeleteIndexedFileResponse {
   request_id: string;
 }
 
+/** Configuration values */
+export interface ConfigValues {
+  provider_type: string;
+  provider_name: string;
+  provider_fallback: string;
+  model_ollama: string;
+  model_purdue: string;
+  model_anthropic: string;
+  chat_rag_enabled: boolean;
+  chat_rag_top_k: number;
+  chat_rag_similarity_threshold: number;
+  chat_rag_use_context_cache: boolean;
+  chat_rag_use_conversation_aware: boolean;
+  rag_collection_name: string;
+  rag_chunk_size: number;
+  rag_chunk_overlap: number;
+  rag_use_persistent: boolean;
+  embedding_model: string;
+  qdrant_host: string;
+  qdrant_port: number;
+  redis_host: string;
+  redis_port: number;
+  blob_storage_path: string;
+  worker_job_timeout: number;
+  log_output: boolean;
+  purdue_api_key_set: boolean;
+  anthropic_api_key_set: boolean;
+  openai_api_key_set: boolean;
+}
+
+/** Get config response */
+export interface GetConfigResponse {
+  config: ConfigValues;
+  request_id: string;
+}
+
+/** Config update request */
+export interface ConfigUpdateRequest {
+  provider_name?: string;
+  model_ollama?: string;
+  model_purdue?: string;
+  model_anthropic?: string;
+  chat_rag_enabled?: boolean;
+  chat_rag_top_k?: number;
+  chat_rag_similarity_threshold?: number;
+  rag_chunk_size?: number;
+  rag_chunk_overlap?: number;
+  embedding_model?: string;
+  qdrant_host?: string;
+  qdrant_port?: number;
+  redis_host?: string;
+  redis_port?: number;
+  log_output?: boolean;
+}
+
+/** Config update response */
+export interface ConfigUpdateResponse {
+  updated: boolean;
+  fields?: string[];
+  message: string;
+  request_id: string;
+}
+
+/** Config schema field */
+export interface ConfigSchemaField {
+  type: string;
+  options?: string[];
+  min?: number;
+  max?: number;
+  description: string;
+}
+
+/** Get config schema response */
+export interface GetConfigSchemaResponse {
+  schema: Record<string, ConfigSchemaField>;
+  request_id: string;
+}
+
 // ===== Error Handling =====
 
 /** Typed API error class */
@@ -498,6 +576,45 @@ export const api = {
   async listModels(): Promise<ModelsResponse> {
     try {
       const response = await apiClient.get<ModelsResponse>("/v1/models");
+      return response.data;
+    } catch (error) {
+      throw parseError(error);
+    }
+  },
+
+  // ----- Config Endpoints -----
+
+  /** Get current configuration */
+  async getConfig(): Promise<GetConfigResponse> {
+    try {
+      const response = await apiClient.get<GetConfigResponse>("/v1/config");
+      return response.data;
+    } catch (error) {
+      throw parseError(error);
+    }
+  },
+
+  /** Update configuration values */
+  async updateConfig(
+    request: ConfigUpdateRequest
+  ): Promise<ConfigUpdateResponse> {
+    try {
+      const response = await apiClient.patch<ConfigUpdateResponse>(
+        "/v1/config",
+        request
+      );
+      return response.data;
+    } catch (error) {
+      throw parseError(error);
+    }
+  },
+
+  /** Get configuration schema */
+  async getConfigSchema(): Promise<GetConfigSchemaResponse> {
+    try {
+      const response = await apiClient.get<GetConfigSchemaResponse>(
+        "/v1/config/schema"
+      );
       return response.data;
     } catch (error) {
       throw parseError(error);
