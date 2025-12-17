@@ -2,6 +2,7 @@
 
 import { DocumentDropzone } from "@/components/DocumentDropzone";
 import { FileStatus } from "@/components/FileStatus";
+import { ChatBox } from "@/components/ChatBox";
 
 export default function Home() {
   const handleFilesSelected = (files: File[]) => {
@@ -23,6 +24,8 @@ export default function Home() {
         <DocumentDropzone onFilesSelected={handleFilesSelected} />
 
         <FileStatus />
+
+        <ChatBox />
       </main>
     </div>
   );

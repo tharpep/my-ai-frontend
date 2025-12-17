@@ -2,10 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { api } from "@/lib/api";
-import { RefreshCw, FileText, Database, Clock } from "lucide-react";
+import { RefreshCw, FileText, Database, Clock, Trash2 } from "lucide-react";
 
 export function FileStatus() {
   const [indexed, setIndexed] = useState<number | null>(null);
+  const [indexedFiles, setIndexedFiles] = useState<any[]>([]);
   const [blobs, setBlobs] = useState<any[]>([]);
   const [jobs, setJobs] = useState<Map<string, any>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -14,12 +15,29 @@ export function FileStatus() {
     setLoading(true);
     try {
       // Get indexed stats
-      const indexedData = await api.getIndexedStats();
-      setIndexed(indexedData.total_documents);
+      try {
+        const indexedData = await api.getIndexedStats();
+        setIndexed(indexedData.total_documents);
+      } catch (error) {
+        // Indexed stats might timeout, continue with other data
+        console.error("Failed to load indexed stats:", error);
+      }
+
+      // Get indexed files
+      try {
+        const indexedFilesData = await api.listIndexedFiles();
+        setIndexedFiles(indexedFilesData.files);
+      } catch (error) {
+        console.error("Failed to load indexed files:", error);
+      }
 
       // Get blobs
-      const blobsData = await api.listBlobs();
-      setBlobs(blobsData.blobs);
+      try {
+        const blobsData = await api.listBlobs();
+        setBlobs(blobsData.blobs);
+      } catch (error) {
+        console.error("Failed to load blobs:", error);
+      }
 
       // Get job statuses from tracked job IDs
       const jobIds = JSON.parse(localStorage.getItem("jobIds") || "[]");
@@ -44,6 +62,39 @@ export function FileStatus() {
       console.error("Failed to load file status:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteBlob = async (blobId: string) => {
+    if (!confirm("Are you sure you want to delete this file?")) {
+      return;
+    }
+    try {
+      await api.deleteBlob(blobId);
+      // Refresh the list
+      const blobsData = await api.listBlobs();
+      setBlobs(blobsData.blobs);
+    } catch (error) {
+      console.error("Failed to delete blob:", error);
+      alert("Failed to delete file. Please try again.");
+    }
+  };
+
+  const handleDeleteIndexedFile = async (blobId: string) => {
+    if (!confirm("Are you sure you want to delete this indexed file?")) {
+      return;
+    }
+    try {
+      await api.deleteIndexedFile(blobId);
+      // Refresh the list
+      const indexedFilesData = await api.listIndexedFiles();
+      setIndexedFiles(indexedFilesData.files);
+      // Also refresh stats
+      const indexedData = await api.getIndexedStats();
+      setIndexed(indexedData.total_documents);
+    } catch (error) {
+      console.error("Failed to delete indexed file:", error);
+      alert("Failed to delete indexed file. Please try again.");
     }
   };
 
@@ -78,17 +129,42 @@ export function FileStatus() {
 
       {/* Indexed Files */}
       <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-800">
-        <div className="flex items-center gap-3">
+        <div className="mb-3 flex items-center gap-3">
           <Database className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-          <div>
-            <h3 className="font-medium text-zinc-900 dark:text-zinc-50">
-              Indexed Files
-            </h3>
-            <p className="text-sm text-zinc-600 dark:text-zinc-400">
-              {indexed ?? 0} documents in vector database
-            </p>
-          </div>
+          <h3 className="font-medium text-zinc-900 dark:text-zinc-50">
+            Indexed Files ({indexedFiles.length})
+          </h3>
         </div>
+        {indexedFiles.length === 0 ? (
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            No indexed files
+          </p>
+        ) : (
+          <div className="space-y-2">
+            {indexedFiles.map((file) => (
+              <div
+                key={file.blob_id}
+                className="flex items-center justify-between rounded border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-600 dark:bg-zinc-700/50"
+              >
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                    {file.filename}
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {file.chunk_count} chunk{file.chunk_count !== 1 ? "s" : ""}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDeleteIndexedFile(file.blob_id)}
+                  className="ml-2 rounded p-1.5 text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
+                  title="Delete indexed file"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Blobs */}
@@ -108,15 +184,24 @@ export function FileStatus() {
             {blobs.map((blob) => (
               <div
                 key={blob.blob_id}
-                className="rounded border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-600 dark:bg-zinc-700/50"
+                className="flex items-center justify-between rounded border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-600 dark:bg-zinc-700/50"
               >
-                <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
-                  {blob.original_filename}
-                </p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {(blob.size_bytes / 1024).toFixed(2)} KB •{" "}
-                  {new Date(blob.created_at).toLocaleString()}
-                </p>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-zinc-900 dark:text-zinc-50">
+                    {blob.original_filename}
+                  </p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {(blob.size_bytes / 1024).toFixed(2)} KB •{" "}
+                    {new Date(blob.created_at).toLocaleString()}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDeleteBlob(blob.blob_id)}
+                  className="ml-2 rounded p-1.5 text-red-600 transition-colors hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-950/20"
+                  title="Delete file"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               </div>
             ))}
           </div>

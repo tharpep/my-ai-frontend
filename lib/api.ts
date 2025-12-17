@@ -217,6 +217,28 @@ export interface IndexedStatsResponse {
   request_id: string;
 }
 
+/** Indexed file info */
+export interface IndexedFileInfo {
+  blob_id: string;
+  filename: string;
+  chunk_count: number;
+}
+
+/** List indexed files response */
+export interface ListIndexedFilesResponse {
+  files: IndexedFileInfo[];
+  total_files: number;
+  request_id: string;
+}
+
+/** Delete indexed file response */
+export interface DeleteIndexedFileResponse {
+  deleted: boolean;
+  blob_id: string;
+  message: string;
+  request_id: string;
+}
+
 // ===== Error Handling =====
 
 /** Typed API error class */
@@ -409,6 +431,30 @@ export const api = {
     try {
       const response = await apiClient.get<IndexedStatsResponse>(
         "/v1/ingest/indexed"
+      );
+      return response.data;
+    } catch (error) {
+      throw parseError(error);
+    }
+  },
+
+  /** List indexed files */
+  async listIndexedFiles(): Promise<ListIndexedFilesResponse> {
+    try {
+      const response = await apiClient.get<ListIndexedFilesResponse>(
+        "/v1/ingest/indexed/files"
+      );
+      return response.data;
+    } catch (error) {
+      throw parseError(error);
+    }
+  },
+
+  /** Delete indexed file by blob_id */
+  async deleteIndexedFile(blobId: string): Promise<DeleteIndexedFileResponse> {
+    try {
+      const response = await apiClient.delete<DeleteIndexedFileResponse>(
+        `/v1/ingest/indexed/${blobId}`
       );
       return response.data;
     } catch (error) {
