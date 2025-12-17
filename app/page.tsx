@@ -1,6 +1,7 @@
 "use client";
 
 import { DocumentDropzone } from "@/components/DocumentDropzone";
+import { FileStatus } from "@/components/FileStatus";
 
 export default function Home() {
   const handleFilesSelected = (files: File[]) => {
@@ -8,9 +9,9 @@ export default function Home() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 p-4 dark:bg-zinc-950">
-      <main className="w-full max-w-2xl">
-        <div className="mb-8 text-center">
+    <div className="min-h-screen bg-zinc-50 p-4 dark:bg-zinc-950">
+      <main className="mx-auto w-full max-w-4xl space-y-8">
+        <div className="text-center">
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
             Document Ingestion
           </h1>
@@ -20,6 +21,8 @@ export default function Home() {
         </div>
 
         <DocumentDropzone onFilesSelected={handleFilesSelected} />
+
+        <FileStatus />
       </main>
     </div>
   );

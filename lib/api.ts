@@ -12,7 +12,7 @@ import axios, { AxiosInstance, AxiosError } from "axios";
 
 // ===== Configuration =====
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:11434";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
 // ===== Type Definitions =====
 
@@ -208,6 +208,15 @@ export interface DeleteBlobResponse {
   request_id: string;
 }
 
+/** Indexed stats response */
+export interface IndexedStatsResponse {
+  collection: string;
+  total_documents: number;
+  vector_dimension: number;
+  storage_type: string;
+  request_id: string;
+}
+
 // ===== Error Handling =====
 
 /** Typed API error class */
@@ -234,13 +243,19 @@ export class ApiClientError extends Error {
 }
 
 /** Parse axios error into typed ApiClientError */
-function parseError(error: AxiosError<ApiError>): ApiClientError {
-  if (error.response?.data?.error) {
-    const { message, type, code } = error.response.data.error;
-    const requestId = error.response.data.request_id ?? "unknown";
+function parseError(error: unknown): ApiClientError {
+  const axiosError = error as AxiosError<ApiError>;
+  
+  if (axiosError.response?.data?.error) {
+    const errorData = axiosError.response.data.error;
+    const message = errorData?.message ?? "Unknown error";
+    const type = errorData?.type ?? "unknown_error";
+    const code = errorData?.code ?? "unknown";
+    const requestId = axiosError.response.data.request_id ?? "unknown";
+    
     return new ApiClientError(
       message,
-      error.response.status,
+      axiosError.response.status ?? 500,
       type,
       code,
       requestId
@@ -249,8 +264,8 @@ function parseError(error: AxiosError<ApiError>): ApiClientError {
 
   // Fallback for non-standard errors
   return new ApiClientError(
-    error.message ?? "Unknown error",
-    error.response?.status ?? 0,
+    axiosError.message ?? "Unknown error",
+    axiosError.response?.status ?? 0,
     "network_error",
     "unknown",
     "unknown"
@@ -304,7 +319,7 @@ export const api = {
       );
       return response.data;
     } catch (error) {
-      throw parseError(error as AxiosError<ApiError>);
+      throw parseError(error);
     }
   },
 
@@ -314,7 +329,7 @@ export const api = {
       const response = await apiClient.get<StatsResponse>("/v1/stats");
       return response.data;
     } catch (error) {
-      throw parseError(error as AxiosError<ApiError>);
+      throw parseError(error);
     }
   },
 
@@ -329,7 +344,7 @@ export const api = {
       );
       return response.data;
     } catch (error) {
-      throw parseError(error as AxiosError<ApiError>);
+      throw parseError(error);
     }
   },
 
@@ -349,7 +364,7 @@ export const api = {
       );
       return response.data;
     } catch (error) {
-      throw parseError(error as AxiosError<ApiError>);
+      throw parseError(error);
     }
   },
 
@@ -361,7 +376,7 @@ export const api = {
       );
       return response.data;
     } catch (error) {
-      throw parseError(error as AxiosError<ApiError>);
+      throw parseError(error);
     }
   },
 
@@ -373,7 +388,7 @@ export const api = {
       );
       return response.data;
     } catch (error) {
-      throw parseError(error as AxiosError<ApiError>);
+      throw parseError(error);
     }
   },
 
@@ -385,7 +400,19 @@ export const api = {
       );
       return response.data;
     } catch (error) {
-      throw parseError(error as AxiosError<ApiError>);
+      throw parseError(error);
+    }
+  },
+
+  /** Get indexed documents stats */
+  async getIndexedStats(): Promise<IndexedStatsResponse> {
+    try {
+      const response = await apiClient.get<IndexedStatsResponse>(
+        "/v1/ingest/indexed"
+      );
+      return response.data;
+    } catch (error) {
+      throw parseError(error);
     }
   },
 
@@ -402,7 +429,7 @@ export const api = {
       );
       return response.data;
     } catch (error) {
-      throw parseError(error as AxiosError<ApiError>);
+      throw parseError(error);
     }
   },
 
@@ -417,7 +444,7 @@ export const api = {
       );
       return response.data;
     } catch (error) {
-      throw parseError(error as AxiosError<ApiError>);
+      throw parseError(error);
     }
   },
 
@@ -427,7 +454,7 @@ export const api = {
       const response = await apiClient.get<ModelsResponse>("/v1/models");
       return response.data;
     } catch (error) {
-      throw parseError(error as AxiosError<ApiError>);
+      throw parseError(error);
     }
   },
 };

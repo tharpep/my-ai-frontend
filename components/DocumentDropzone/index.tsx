@@ -30,7 +30,11 @@ export function DocumentDropzone({
       // Upload files
       for (const file of files) {
         try {
-          await api.uploadDocument(file);
+          const response = await api.uploadDocument(file);
+          // Store job ID in localStorage for tracking
+          const jobIds = JSON.parse(localStorage.getItem("jobIds") || "[]");
+          jobIds.push(response.job_id);
+          localStorage.setItem("jobIds", JSON.stringify(jobIds));
         } catch (error) {
           console.error(`Failed to upload ${file.name}:`, error);
         }
