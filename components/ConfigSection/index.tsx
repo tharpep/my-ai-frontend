@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { api, ApiClientError, ConfigValues } from "@/lib/api";
-import { Settings, Save, RefreshCw, CheckCircle2, XCircle } from "lucide-react";
+import { Settings, Save, RefreshCw, CheckCircle2, XCircle, RotateCcw } from "lucide-react";
 
 export function ConfigSection() {
   const [config, setConfig] = useState<ConfigValues | null>(null);
@@ -15,6 +15,10 @@ export function ConfigSection() {
     try {
       const response = await api.getConfig();
       setConfig(response.config);
+      setMessage({
+        type: "success",
+        text: "Configuration reloaded from server",
+      });
     } catch (error) {
       console.error("Failed to load config:", error);
       setMessage({
@@ -98,13 +102,6 @@ export function ConfigSection() {
           <Settings className="h-5 w-5 text-blue-600 dark:text-blue-400" />
           <h3 className="font-medium text-zinc-900 dark:text-zinc-50">Configuration</h3>
         </div>
-        <button
-          onClick={loadConfig}
-          className="rounded p-1.5 text-zinc-500 transition-colors hover:bg-zinc-100 dark:text-zinc-400 dark:hover:bg-zinc-700"
-          title="Refresh"
-        >
-          <RefreshCw className="h-4 w-4" />
-        </button>
       </div>
 
       <div className="p-4 space-y-4">
@@ -276,24 +273,33 @@ export function ConfigSection() {
           <span className="text-sm text-zinc-700 dark:text-zinc-300">Verbose Logging</span>
         </label>
 
-        {/* Save Button */}
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
-        >
-          {saving ? (
-            <>
-              <RefreshCw className="h-4 w-4 animate-spin" />
-              <span>Saving...</span>
-            </>
-          ) : (
-            <>
-              <Save className="h-4 w-4" />
-              <span>Save Configuration</span>
-            </>
-          )}
-        </button>
+        {/* Action Buttons */}
+        <div className="flex gap-2">
+          <button
+            onClick={loadConfig}
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+          >
+            <RotateCcw className="h-4 w-4" />
+            <span>Reset to Defaults</span>
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
+          >
+            {saving ? (
+              <>
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <span>Saving...</span>
+              </>
+            ) : (
+              <>
+                <Save className="h-4 w-4" />
+                <span>Save</span>
+              </>
+            )}
+          </button>
+        </div>
       </div>
     </div>
   );

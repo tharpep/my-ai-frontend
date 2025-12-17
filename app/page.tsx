@@ -4,6 +4,7 @@ import { DocumentDropzone } from "@/components/DocumentDropzone";
 import { FileStatus } from "@/components/FileStatus";
 import { ChatBox } from "@/components/ChatBox";
 import { ConfigSection } from "@/components/ConfigSection";
+import { TerminalOutput } from "@/components/TerminalOutput";
 
 export default function Home() {
   const handleFilesSelected = (files: File[]) => {
@@ -22,18 +23,23 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {/* Left Column */}
-          <div className="space-y-6">
-            <DocumentDropzone onFilesSelected={handleFilesSelected} />
-            <FileStatus />
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            {/* Left Column */}
+            <div className="space-y-6">
+              <DocumentDropzone onFilesSelected={handleFilesSelected} />
+              <FileStatus />
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-6">
+              <ChatBox />
+              <ConfigSection />
+            </div>
           </div>
 
-          {/* Right Column */}
-          <div className="space-y-6">
-            <ChatBox />
-            <ConfigSection />
-          </div>
+          {/* Terminal Output - Full Width */}
+          <TerminalOutput />
         </div>
       </main>
     </div>

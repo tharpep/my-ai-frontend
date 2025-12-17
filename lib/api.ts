@@ -317,6 +317,30 @@ export interface GetConfigSchemaResponse {
   request_id: string;
 }
 
+/** Log entry */
+export interface LogEntry {
+  request_id: string;
+  timestamp: string;
+  endpoint: string;
+  method: string;
+  status_code: number;
+  provider?: string;
+  model?: string;
+  response_time_ms?: number;
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
+  error_type?: string;
+  error_message?: string;
+}
+
+/** Get logs response */
+export interface GetLogsResponse {
+  logs: LogEntry[];
+  total: number;
+  request_id: string;
+}
+
 // ===== Error Handling =====
 
 /** Typed API error class */
@@ -615,6 +639,20 @@ export const api = {
       const response = await apiClient.get<GetConfigSchemaResponse>(
         "/v1/config/schema"
       );
+      return response.data;
+    } catch (error) {
+      throw parseError(error);
+    }
+  },
+
+  // ----- Logs Endpoints -----
+
+  /** Get recent request logs */
+  async getLogs(limit?: number): Promise<GetLogsResponse> {
+    try {
+      const response = await apiClient.get<GetLogsResponse>("/v1/logs", {
+        params: limit ? { limit } : {},
+      });
       return response.data;
     } catch (error) {
       throw parseError(error);
