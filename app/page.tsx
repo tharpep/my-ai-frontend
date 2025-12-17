@@ -11,8 +11,8 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-zinc-50 p-4 dark:bg-zinc-950">
-      <main className="mx-auto w-full max-w-4xl space-y-8">
-        <div className="text-center">
+      <main className="mx-auto w-full max-w-7xl">
+        <div className="mb-8 text-center">
           <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
             Document Ingestion
           </h1>
@@ -21,11 +21,18 @@ export default function Home() {
           </p>
         </div>
 
-        <DocumentDropzone onFilesSelected={handleFilesSelected} />
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* Left Column */}
+          <div className="space-y-6">
+            <DocumentDropzone onFilesSelected={handleFilesSelected} />
+            <FileStatus />
+          </div>
 
-        <FileStatus />
-
-        <ChatBox />
+          {/* Right Column */}
+          <div className="space-y-6">
+            <ChatBox />
+          </div>
+        </div>
       </main>
     </div>
   );
