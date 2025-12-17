@@ -12,7 +12,7 @@ import axios, { AxiosInstance, AxiosError } from "axios";
 
 // ===== Configuration =====
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:11434";
 
 // ===== Type Definitions =====
 
