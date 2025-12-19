@@ -39,17 +39,21 @@ export function ConfigSection() {
     try {
       const updates: any = {};
       
-      // Only send changed values
-      if (config.provider_name) updates.provider_name = config.provider_name;
-      if (config.model_ollama) updates.model_ollama = config.model_ollama;
-      if (config.model_purdue) updates.model_purdue = config.model_purdue;
-      if (config.model_anthropic) updates.model_anthropic = config.model_anthropic;
-      if (config.chat_rag_enabled !== undefined) updates.chat_rag_enabled = config.chat_rag_enabled;
-      if (config.chat_rag_top_k !== undefined) updates.chat_rag_top_k = config.chat_rag_top_k;
-      if (config.chat_rag_similarity_threshold !== undefined) updates.chat_rag_similarity_threshold = config.chat_rag_similarity_threshold;
-      if (config.rag_chunk_size !== undefined) updates.rag_chunk_size = config.rag_chunk_size;
-      if (config.rag_chunk_overlap !== undefined) updates.rag_chunk_overlap = config.rag_chunk_overlap;
-      if (config.embedding_model) updates.embedding_model = config.embedding_model;
+      // Send all configurable values (including false booleans and empty strings)
+      // Only skip undefined/null values
+      if (config.provider_name !== undefined) updates.provider_name = config.provider_name;
+      if (config.model_ollama !== undefined) updates.model_ollama = config.model_ollama;
+      if (config.model_purdue !== undefined) updates.model_purdue = config.model_purdue;
+      if (config.model_anthropic !== undefined) updates.model_anthropic = config.model_anthropic;
+      if (config.chat_context_enabled !== undefined) updates.chat_context_enabled = config.chat_context_enabled;
+      if (config.chat_library_enabled !== undefined) updates.chat_library_enabled = config.chat_library_enabled;
+      if (config.chat_library_top_k !== undefined) updates.chat_library_top_k = config.chat_library_top_k;
+      if (config.chat_library_similarity_threshold !== undefined) updates.chat_library_similarity_threshold = config.chat_library_similarity_threshold;
+      if (config.chat_journal_enabled !== undefined) updates.chat_journal_enabled = config.chat_journal_enabled;
+      if (config.chat_journal_top_k !== undefined) updates.chat_journal_top_k = config.chat_journal_top_k;
+      if (config.library_chunk_size !== undefined) updates.library_chunk_size = config.library_chunk_size;
+      if (config.library_chunk_overlap !== undefined) updates.library_chunk_overlap = config.library_chunk_overlap;
+      if (config.embedding_model !== undefined) updates.embedding_model = config.embedding_model;
       if (config.log_output !== undefined) updates.log_output = config.log_output;
 
       const response = await api.updateConfig(updates);
@@ -171,45 +175,83 @@ export function ConfigSection() {
           </div>
         </div>
 
-        {/* RAG Settings */}
+        {/* Context Settings */}
         <div className="space-y-3 rounded-lg border border-zinc-200 bg-zinc-50 p-3 dark:border-zinc-600 dark:bg-zinc-700/50">
-          <h4 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">RAG Settings</h4>
+          <h4 className="text-sm font-medium text-zinc-900 dark:text-zinc-50">Context Settings</h4>
           
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
-              checked={config.chat_rag_enabled}
-              onChange={(e) => setConfig({ ...config, chat_rag_enabled: e.target.checked })}
+              checked={config.chat_context_enabled}
+              onChange={(e) => setConfig({ ...config, chat_context_enabled: e.target.checked })}
               className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 dark:border-zinc-600"
             />
-            <span className="text-sm text-zinc-700 dark:text-zinc-300">Enable RAG in Chat</span>
+            <span className="text-sm text-zinc-700 dark:text-zinc-300">Enable Context Injection</span>
           </label>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="space-y-3 rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-600 dark:bg-zinc-800">
+            <h5 className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Library (Documents)</h5>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={config.chat_library_enabled}
+                onChange={(e) => setConfig({ ...config, chat_library_enabled: e.target.checked })}
+                className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 dark:border-zinc-600"
+              />
+              <span className="text-sm text-zinc-700 dark:text-zinc-300">Enable Library Context</span>
+            </label>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                  Library Top K
+                </label>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={config.chat_library_top_k}
+                  onChange={(e) => setConfig({ ...config, chat_library_top_k: parseInt(e.target.value) || 0 })}
+                  className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                  Similarity Threshold
+                </label>
+                <input
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.1}
+                  value={config.chat_library_similarity_threshold}
+                  onChange={(e) => setConfig({ ...config, chat_library_similarity_threshold: parseFloat(e.target.value) || 0 })}
+                  className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-3 rounded-lg border border-zinc-200 bg-white p-3 dark:border-zinc-600 dark:bg-zinc-800">
+            <h5 className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Journal (Chat History)</h5>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                checked={config.chat_journal_enabled}
+                onChange={(e) => setConfig({ ...config, chat_journal_enabled: e.target.checked })}
+                className="rounded border-zinc-300 text-blue-600 focus:ring-blue-500 dark:border-zinc-600"
+              />
+              <span className="text-sm text-zinc-700 dark:text-zinc-300">Enable Journal Context</span>
+            </label>
             <div>
-              <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                RAG Top K
+              <label className="mb-1 block text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                Journal Top K
               </label>
               <input
                 type="number"
                 min={1}
-                max={100}
-                value={config.chat_rag_top_k}
-                onChange={(e) => setConfig({ ...config, chat_rag_top_k: parseInt(e.target.value) || 0 })}
-                className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
-              />
-            </div>
-            <div>
-              <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
-                Similarity Threshold
-              </label>
-              <input
-                type="number"
-                min={0}
-                max={1}
-                step={0.1}
-                value={config.chat_rag_similarity_threshold}
-                onChange={(e) => setConfig({ ...config, chat_rag_similarity_threshold: parseFloat(e.target.value) || 0 })}
+                max={50}
+                value={config.chat_journal_top_k}
+                onChange={(e) => setConfig({ ...config, chat_journal_top_k: parseInt(e.target.value) || 0 })}
                 className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
               />
             </div>
@@ -224,10 +266,13 @@ export function ConfigSection() {
                 type="number"
                 min={100}
                 max={5000}
-                value={config.rag_chunk_size}
-                onChange={(e) => setConfig({ ...config, rag_chunk_size: parseInt(e.target.value) || 0 })}
+                value={config.library_chunk_size || 1000}
+                onChange={(e) => setConfig({ ...config, library_chunk_size: parseInt(e.target.value) || 1000 })}
                 className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
               />
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                Default: 1000 characters
+              </p>
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-zinc-700 dark:text-zinc-300">
@@ -237,10 +282,13 @@ export function ConfigSection() {
                 type="number"
                 min={0}
                 max={500}
-                value={config.rag_chunk_overlap}
-                onChange={(e) => setConfig({ ...config, rag_chunk_overlap: parseInt(e.target.value) || 0 })}
+                value={config.library_chunk_overlap ?? 100}
+                onChange={(e) => setConfig({ ...config, library_chunk_overlap: parseInt(e.target.value) || 100 })}
                 className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
               />
+              <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                Default: 100 characters
+              </p>
             </div>
           </div>
         </div>
@@ -252,9 +300,10 @@ export function ConfigSection() {
           </label>
           <input
             type="text"
-            value={config.embedding_model}
+            value={config.embedding_model || ""}
+            placeholder="bge-m3"
             onChange={(e) => setConfig({ ...config, embedding_model: e.target.value })}
-            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50"
+            className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder-zinc-500"
           />
         </div>
 

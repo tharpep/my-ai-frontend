@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { api, ApiClientError } from "@/lib/api";
-import { Send, Loader2, MessageSquare } from "lucide-react";
+import { api, ApiClientError, ConfigValues, RAGContext } from "@/lib/api";
+import { Send, Loader2, MessageSquare, ChevronDown, ChevronUp, FileText, History } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
@@ -12,7 +12,145 @@ interface Message {
     provider?: string;
     tokens?: number;
     requestId?: string;
+    ragContext?: RAGContext;
   };
+}
+
+function RAGContextDisplay({ context }: { context: RAGContext }) {
+  const [expanded, setExpanded] = useState(false);
+  const [expandedSection, setExpandedSection] = useState<"library" | "journal" | null>(null);
+
+  return (
+    <div className="mt-3 rounded border border-zinc-300/50 bg-zinc-50/50 dark:border-zinc-600/50 dark:bg-zinc-800/50">
+      <button
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full items-center justify-between p-2 text-left text-xs font-medium text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-700/50"
+      >
+        <span className="flex items-center gap-2">
+          <FileText className="h-3 w-3" />
+          RAG Context
+          {context.library.enabled && (
+            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+              {context.library.doc_count} docs
+            </span>
+          )}
+          {context.journal.enabled && (
+            <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
+              {context.journal.entry_count} entries
+            </span>
+          )}
+        </span>
+        {expanded ? (
+          <ChevronUp className="h-3 w-3" />
+        ) : (
+          <ChevronDown className="h-3 w-3" />
+        )}
+      </button>
+
+      {expanded && (
+        <div className="border-t border-zinc-300/50 p-2 space-y-3 text-xs dark:border-zinc-600/50">
+          {/* Timing */}
+          <div className="text-zinc-600 dark:text-zinc-400">
+            <p>Prep: {context.prep_time_ms.toFixed(1)}ms • LLM: {context.llm_time_ms.toFixed(1)}ms</p>
+          </div>
+
+          {/* Library Context */}
+          {context.library.enabled && (
+            <div className="rounded border border-zinc-200 bg-white p-2 dark:border-zinc-700 dark:bg-zinc-800">
+              <button
+                onClick={() => setExpandedSection(expandedSection === "library" ? null : "library")}
+                className="flex w-full items-center justify-between text-left font-medium text-zinc-700 dark:text-zinc-300"
+              >
+                <span className="flex items-center gap-2">
+                  <FileText className="h-3 w-3" />
+                  Library ({context.library.doc_count} docs)
+                </span>
+                {expandedSection === "library" ? (
+                  <ChevronUp className="h-3 w-3" />
+                ) : (
+                  <ChevronDown className="h-3 w-3" />
+                )}
+              </button>
+              {expandedSection === "library" && (
+                <div className="mt-2 space-y-2">
+                  {context.library.documents.map((doc, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-900"
+                    >
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                          Doc {idx + 1}
+                        </span>
+                        <span className="text-zinc-500 dark:text-zinc-400">
+                          Similarity: {(doc.similarity * 100).toFixed(1)}%
+                        </span>
+                      </div>
+                      <p className="text-zinc-600 dark:text-zinc-400">{doc.text}</p>
+                    </div>
+                  ))}
+                  {context.library.context_text && (
+                    <div className="mt-2 rounded border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-900">
+                      <p className="mb-1 font-medium text-zinc-700 dark:text-zinc-300">
+                        Context Text:
+                      </p>
+                      <p className="text-zinc-600 dark:text-zinc-400">
+                        {context.library.context_text}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Journal Context */}
+          {context.journal.enabled && (
+            <div className="rounded border border-zinc-200 bg-white p-2 dark:border-zinc-700 dark:bg-zinc-800">
+              <button
+                onClick={() => setExpandedSection(expandedSection === "journal" ? null : "journal")}
+                className="flex w-full items-center justify-between text-left font-medium text-zinc-700 dark:text-zinc-300"
+              >
+                <span className="flex items-center gap-2">
+                  <History className="h-3 w-3" />
+                  Journal ({context.journal.entry_count} entries)
+                </span>
+                {expandedSection === "journal" ? (
+                  <ChevronUp className="h-3 w-3" />
+                ) : (
+                  <ChevronDown className="h-3 w-3" />
+                )}
+              </button>
+              {expandedSection === "journal" && (
+                <div className="mt-2 space-y-2">
+                  {context.journal.entries.map((entry, idx) => (
+                    <div
+                      key={idx}
+                      className="rounded border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-900"
+                    >
+                      <pre className="text-[10px] text-zinc-600 dark:text-zinc-400">
+                        {JSON.stringify(entry, null, 2)}
+                      </pre>
+                    </div>
+                  ))}
+                  {context.journal.context_text && (
+                    <div className="mt-2 rounded border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-900">
+                      <p className="mb-1 font-medium text-zinc-700 dark:text-zinc-300">
+                        Context Text:
+                      </p>
+                      <p className="text-zinc-600 dark:text-zinc-400">
+                        {context.journal.context_text}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export function ChatBox() {
@@ -20,9 +158,38 @@ export function ChatBox() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [config, setConfig] = useState<ConfigValues | null>(null);
+  const [sessionId, setSessionId] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
-
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+
+  // Initialize session ID on client side only
+  useEffect(() => {
+    // Generate or retrieve session ID for Journal context
+    if (typeof window !== "undefined") {
+      const stored = localStorage.getItem("chatSessionId");
+      if (stored) {
+        setSessionId(stored);
+      } else {
+        const newId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        localStorage.setItem("chatSessionId", newId);
+        setSessionId(newId);
+      }
+    }
+  }, []);
+
+  // Load config on mount
+  useEffect(() => {
+    const loadConfig = async () => {
+      try {
+        const response = await api.getConfig();
+        setConfig(response.config);
+      } catch (error) {
+        console.error("Failed to load config for chat:", error);
+      }
+    };
+    loadConfig();
+  }, []);
 
   const scrollToBottom = () => {
     if (messagesContainerRef.current) {
@@ -48,11 +215,20 @@ export function ChatBox() {
     setIsLoading(true);
 
     try {
+      // Use config values for context settings, with fallbacks if config not loaded
+      const useLibrary = config?.chat_context_enabled && config?.chat_library_enabled;
+      const useJournal = config?.chat_context_enabled && config?.chat_journal_enabled;
+      
       const response = await api.chatCompletion({
         messages: [...messages, userMessage].map((m) => ({
           role: m.role,
           content: m.content,
         })),
+        use_library: useLibrary ?? undefined,
+        use_journal: useJournal ?? undefined,
+        library_top_k: config?.chat_library_top_k ?? undefined,
+        journal_top_k: config?.chat_journal_top_k ?? undefined,
+        session_id: useJournal ? sessionId : undefined,
       });
 
       const assistantMessage: Message = {
@@ -63,6 +239,7 @@ export function ChatBox() {
           provider: response.provider,
           tokens: response.usage?.total_tokens,
           requestId: response.request_id,
+          ragContext: response.rag_context,
         },
       };
 
@@ -78,11 +255,30 @@ export function ChatBox() {
     }
   };
 
+  const isContextEnabled = config?.chat_context_enabled && (config?.chat_library_enabled || config?.chat_journal_enabled);
+
   return (
     <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800">
-      <div className="flex items-center gap-2 border-b border-zinc-200 p-4 dark:border-zinc-700">
-        <MessageSquare className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-        <h3 className="font-medium text-zinc-900 dark:text-zinc-50">Chat</h3>
+      <div className="flex items-center justify-between border-b border-zinc-200 p-4 dark:border-zinc-700">
+        <div className="flex items-center gap-2">
+          <MessageSquare className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+          <h3 className="font-medium text-zinc-900 dark:text-zinc-50">Chat</h3>
+          {isContextEnabled && (
+            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+              Context
+            </span>
+          )}
+        </div>
+        {config && (
+          <div className="flex gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+            {config.chat_library_enabled && (
+              <span className="rounded bg-zinc-100 px-1.5 py-0.5 dark:bg-zinc-700">Library</span>
+            )}
+            {config.chat_journal_enabled && (
+              <span className="rounded bg-zinc-100 px-1.5 py-0.5 dark:bg-zinc-700">Journal</span>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="flex h-96 flex-col">
@@ -126,6 +322,9 @@ export function ChatBox() {
                         </p>
                       )}
                     </div>
+                  )}
+                  {message.metadata?.ragContext && (
+                    <RAGContextDisplay context={message.metadata.ragContext} />
                   )}
                 </div>
               </div>

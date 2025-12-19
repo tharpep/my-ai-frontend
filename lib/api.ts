@@ -103,10 +103,38 @@ export interface ChatCompletionRequest {
   temperature?: number;
   top_p?: number;
   max_tokens?: number;
-  use_rag?: boolean;
-  rag_top_k?: number;
+  use_library?: boolean;
+  use_journal?: boolean;
+  library_top_k?: number;
+  journal_top_k?: number;
+  session_id?: string;
   system_prompt?: string;
-  rag_prompt_template?: string;
+  context_prompt_template?: string;
+}
+
+/** RAG context document */
+export interface RAGDocument {
+  text: string;
+  similarity: number;
+  full_text?: string;
+}
+
+/** RAG context metadata */
+export interface RAGContext {
+  library: {
+    enabled: boolean;
+    doc_count: number;
+    documents: RAGDocument[];
+    context_text?: string;
+  };
+  journal: {
+    enabled: boolean;
+    entry_count: number;
+    entries: Array<Record<string, unknown>>;
+    context_text?: string;
+  };
+  prep_time_ms: number;
+  llm_time_ms: number;
 }
 
 /** Chat completion response */
@@ -127,6 +155,7 @@ export interface ChatCompletionResponse {
     total_tokens: number;
   };
   request_id: string;
+  rag_context?: RAGContext;
 }
 
 /** Embedding request */
@@ -247,16 +276,19 @@ export interface ConfigValues {
   model_ollama: string;
   model_purdue: string;
   model_anthropic: string;
-  chat_rag_enabled: boolean;
-  chat_rag_top_k: number;
-  chat_rag_similarity_threshold: number;
-  chat_rag_use_context_cache: boolean;
-  chat_rag_use_conversation_aware: boolean;
-  rag_collection_name: string;
-  rag_chunk_size: number;
-  rag_chunk_overlap: number;
-  rag_use_persistent: boolean;
+  chat_context_enabled: boolean;
+  chat_library_enabled: boolean;
+  chat_library_top_k: number;
+  chat_library_similarity_threshold: number;
+  chat_library_use_cache: boolean;
+  chat_journal_enabled: boolean;
+  chat_journal_top_k: number;
+  library_collection_name: string;
+  library_chunk_size: number;
+  library_chunk_overlap: number;
+  storage_use_persistent: boolean;
   embedding_model: string;
+  hardware_mode: string;
   qdrant_host: string;
   qdrant_port: number;
   redis_host: string;
@@ -281,11 +313,14 @@ export interface ConfigUpdateRequest {
   model_ollama?: string;
   model_purdue?: string;
   model_anthropic?: string;
-  chat_rag_enabled?: boolean;
-  chat_rag_top_k?: number;
-  chat_rag_similarity_threshold?: number;
-  rag_chunk_size?: number;
-  rag_chunk_overlap?: number;
+  chat_context_enabled?: boolean;
+  chat_library_enabled?: boolean;
+  chat_library_top_k?: number;
+  chat_library_similarity_threshold?: number;
+  chat_journal_enabled?: boolean;
+  chat_journal_top_k?: number;
+  library_chunk_size?: number;
+  library_chunk_overlap?: number;
   embedding_model?: string;
   qdrant_host?: string;
   qdrant_port?: number;
@@ -489,6 +524,7 @@ export const api = {
           headers: {
             "Content-Type": "multipart/form-data",
           },
+          timeout: 120000, // 2 minutes for file uploads (larger files may take time)
         }
       );
       return response.data;
@@ -525,7 +561,7 @@ export const api = {
   async deleteBlob(blobId: string): Promise<DeleteBlobResponse> {
     try {
       const response = await apiClient.delete<DeleteBlobResponse>(
-        `/v1/ingest/blobs/${blobId}`
+        `/v1/ingest/blobs/${encodeURIComponent(blobId)}`
       );
       return response.data;
     } catch (error) {
@@ -561,7 +597,7 @@ export const api = {
   async deleteIndexedFile(blobId: string): Promise<DeleteIndexedFileResponse> {
     try {
       const response = await apiClient.delete<DeleteIndexedFileResponse>(
-        `/v1/ingest/indexed/${blobId}`
+        `/v1/ingest/indexed/${encodeURIComponent(blobId)}`
       );
       return response.data;
     } catch (error) {

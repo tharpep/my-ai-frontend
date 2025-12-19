@@ -40,24 +40,36 @@ export function FileStatus() {
       }
 
       // Get job statuses from tracked job IDs
-      const jobIds = JSON.parse(localStorage.getItem("jobIds") || "[]");
-      const jobMap = new Map();
-      for (const jobId of jobIds) {
-        try {
-          const jobStatus = await api.getJobStatus(jobId);
-          jobMap.set(jobId, jobStatus);
-          // Remove completed/failed jobs from tracking
-          if (jobStatus.status === "completed" || jobStatus.status === "failed") {
-            const updated = jobIds.filter((id: string) => id !== jobId);
-            localStorage.setItem("jobIds", JSON.stringify(updated));
+      try {
+        const jobIdsStr = localStorage.getItem("jobIds");
+        const jobIds = jobIdsStr ? JSON.parse(jobIdsStr) : [];
+        if (!Array.isArray(jobIds)) {
+          localStorage.setItem("jobIds", "[]");
+          setJobs(new Map());
+        } else {
+          const jobMap = new Map();
+          for (const jobId of jobIds) {
+            if (typeof jobId !== "string") continue;
+            try {
+              const jobStatus = await api.getJobStatus(jobId);
+              jobMap.set(jobId, jobStatus);
+              // Remove completed/failed jobs from tracking
+              if (jobStatus.status === "completed" || jobStatus.status === "failed") {
+                const updated = jobIds.filter((id: string) => id !== jobId);
+                localStorage.setItem("jobIds", JSON.stringify(updated));
+              }
+            } catch (error) {
+              // Job might not exist anymore, remove from tracking
+              const updated = jobIds.filter((id: string) => id !== jobId);
+              localStorage.setItem("jobIds", JSON.stringify(updated));
+            }
           }
-        } catch (error) {
-          // Job might not exist anymore, remove from tracking
-          const updated = jobIds.filter((id: string) => id !== jobId);
-          localStorage.setItem("jobIds", JSON.stringify(updated));
+          setJobs(jobMap);
         }
+      } catch (error) {
+        console.error("Failed to load job statuses:", error);
+        setJobs(new Map());
       }
-      setJobs(jobMap);
     } catch (error) {
       console.error("Failed to load file status:", error);
     } finally {
@@ -69,6 +81,10 @@ export function FileStatus() {
     if (!confirm("Are you sure you want to delete this file?")) {
       return;
     }
+    if (!blobId) {
+      alert("Invalid file ID");
+      return;
+    }
     try {
       await api.deleteBlob(blobId);
       // Refresh the list
@@ -76,7 +92,8 @@ export function FileStatus() {
       setBlobs(blobsData.blobs);
     } catch (error) {
       console.error("Failed to delete blob:", error);
-      alert("Failed to delete file. Please try again.");
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete file";
+      alert(`Failed to delete file: ${errorMessage}`);
     }
   };
 

@@ -5,6 +5,9 @@ import { FileStatus } from "@/components/FileStatus";
 import { ChatBox } from "@/components/ChatBox";
 import { ConfigSection } from "@/components/ConfigSection";
 import { TerminalOutput } from "@/components/TerminalOutput";
+import { SystemHealthDashboard } from "@/components/SystemHealthDashboard";
+import { RAGStatisticsPanel } from "@/components/RAGStatisticsPanel";
+import { RequestAnalyticsPanel } from "@/components/RequestAnalyticsPanel";
 
 export default function Home() {
   const handleFilesSelected = (files: File[]) => {
@@ -24,17 +27,22 @@ export default function Home() {
         </div>
 
         <div className="space-y-6">
+          {/* System Health Dashboard - Full Width at Top */}
+          <SystemHealthDashboard />
+
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
             {/* Left Column */}
             <div className="space-y-6">
               <DocumentDropzone onFilesSelected={handleFilesSelected} />
               <FileStatus />
+              <RAGStatisticsPanel />
             </div>
 
             {/* Right Column */}
             <div className="space-y-6">
               <ChatBox />
               <ConfigSection />
+              <RequestAnalyticsPanel />
             </div>
           </div>
 

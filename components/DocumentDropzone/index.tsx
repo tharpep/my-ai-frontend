@@ -19,6 +19,8 @@ export function DocumentDropzone({
   className = "",
 }: DocumentDropzoneProps) {
   const [isDragOver, setIsDragOver] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<{ success: number; failed: number } | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const handleFiles = useCallback(
@@ -26,6 +28,8 @@ export function DocumentDropzone({
       if (files.length === 0) return;
 
       onFilesSelected?.(files);
+      setUploading(true);
+      setUploadStatus({ success: 0, failed: 0 });
 
       // Upload files
       for (const file of files) {
@@ -33,12 +37,20 @@ export function DocumentDropzone({
           const response = await api.uploadDocument(file);
           // Store job ID in localStorage for tracking
           const jobIds = JSON.parse(localStorage.getItem("jobIds") || "[]");
-          jobIds.push(response.job_id);
-          localStorage.setItem("jobIds", JSON.stringify(jobIds));
+          if (!jobIds.includes(response.job_id)) {
+            jobIds.push(response.job_id);
+            localStorage.setItem("jobIds", JSON.stringify(jobIds));
+          }
+          setUploadStatus((prev) => prev ? { ...prev, success: prev.success + 1 } : { success: 1, failed: 0 });
         } catch (error) {
           console.error(`Failed to upload ${file.name}:`, error);
+          setUploadStatus((prev) => prev ? { ...prev, failed: prev.failed + 1 } : { success: 0, failed: 1 });
         }
       }
+      
+      setUploading(false);
+      // Clear status after 3 seconds
+      setTimeout(() => setUploadStatus(null), 3000);
     },
     [onFilesSelected]
   );
@@ -145,6 +157,19 @@ export function DocumentDropzone({
       <p className="text-xs text-zinc-400 dark:text-zinc-500">
         Supports: PDF, TXT, MD, DOCX
       </p>
+
+      {uploading && (
+        <p className="mt-2 text-sm text-blue-600 dark:text-blue-400">
+          Uploading...
+        </p>
+      )}
+
+      {uploadStatus && !uploading && (
+        <p className="mt-2 text-sm text-green-600 dark:text-green-400">
+          {uploadStatus.success > 0 && `${uploadStatus.success} file(s) uploaded`}
+          {uploadStatus.failed > 0 && ` • ${uploadStatus.failed} failed`}
+        </p>
+      )}
 
       <input
         ref={inputRef}
