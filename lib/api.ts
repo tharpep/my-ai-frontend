@@ -381,6 +381,33 @@ export interface GetLogsResponse {
   request_id: string;
 }
 
+/** Session metadata */
+export interface SessionMetadata {
+  session_id: string;
+  name?: string;
+  message_count: number;
+  last_activity: string;
+}
+
+/** List sessions response */
+export interface ListSessionsResponse {
+  sessions: SessionMetadata[];
+  total: number;
+}
+
+/** Delete session response */
+export interface DeleteSessionResponse {
+  status: string;
+  session_id: string;
+}
+
+/** Memory stats response */
+export interface MemoryStatsResponse {
+  initialized: boolean;
+  message?: string;
+  [key: string]: unknown;
+}
+
 // ===== Error Handling =====
 
 /** Typed API error class */
@@ -697,6 +724,47 @@ export const api = {
       const response = await apiClient.get<GetLogsResponse>("/v1/logs", {
         params,
       });
+      return response.data;
+    } catch (error) {
+      throw parseError(error);
+    }
+  },
+
+  // ----- Memory/Session Endpoints -----
+
+  /** List all chat sessions */
+  async listSessions(limit?: number): Promise<ListSessionsResponse> {
+    try {
+      const params: any = {};
+      if (limit) params.limit = limit;
+      const response = await apiClient.get<ListSessionsResponse>(
+        "/v1/memory/sessions",
+        { params }
+      );
+      return response.data;
+    } catch (error) {
+      throw parseError(error);
+    }
+  },
+
+  /** Delete a chat session */
+  async deleteSession(sessionId: string): Promise<DeleteSessionResponse> {
+    try {
+      const response = await apiClient.delete<DeleteSessionResponse>(
+        `/v1/memory/sessions/${encodeURIComponent(sessionId)}`
+      );
+      return response.data;
+    } catch (error) {
+      throw parseError(error);
+    }
+  },
+
+  /** Get memory/journal statistics */
+  async getMemoryStats(): Promise<MemoryStatsResponse> {
+    try {
+      const response = await apiClient.get<MemoryStatsResponse>(
+        "/v1/memory/stats"
+      );
       return response.data;
     } catch (error) {
       throw parseError(error);
