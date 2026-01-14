@@ -8,6 +8,7 @@ import { TerminalOutput } from "@/components/TerminalOutput";
 import { SystemHealthDashboard } from "@/components/SystemHealthDashboard";
 import { RAGStatisticsPanel } from "@/components/RAGStatisticsPanel";
 import { RequestAnalyticsPanel } from "@/components/RequestAnalyticsPanel";
+import { AppShell } from "@/components/layout/AppShell";
 
 export default function DevPage() {
   const handleFilesSelected = (files: File[]) => {
@@ -15,8 +16,7 @@ export default function DevPage() {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-zinc-50 p-4 dark:bg-zinc-950">
-      <main className="mx-auto w-full max-w-7xl">
+    <AppShell maxWidth="7xl">
         <div className="mb-8">
           <div className="text-center">
             <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
@@ -51,7 +51,6 @@ export default function DevPage() {
           {/* Terminal Output - Full Width */}
           <TerminalOutput />
         </div>
-      </main>
-    </div>
+    </AppShell>
   );
 }

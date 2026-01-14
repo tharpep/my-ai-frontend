@@ -1,106 +1,95 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { api, ApiClientError, ConfigValues } from "@/lib/api";
+import { ConfigValues } from "@/lib/api";
 import { Settings, Save, RefreshCw, CheckCircle2, XCircle, RotateCcw } from "lucide-react";
 
+// Default dev config (separate from backend)
+const DEFAULT_DEV_CONFIG: ConfigValues = {
+  provider_type: "llm",
+  provider_name: "ollama",
+  provider_fallback: "ollama",
+  model_ollama: "llama3.2:latest",
+  model_purdue: "llama3.1:latest",
+  model_anthropic: "claude-3-sonnet",
+  chat_context_enabled: true,
+  chat_library_enabled: true,
+  chat_library_top_k: 5,
+  chat_library_similarity_threshold: 0.3,
+  chat_library_use_cache: true,
+  chat_journal_enabled: true,
+  chat_journal_top_k: 3,
+  library_collection_name: "library_docs",
+  library_chunk_size: 1000,
+  library_chunk_overlap: 100,
+  storage_use_persistent: true,
+  embedding_model: "nomic-embed-text",
+  hardware_mode: "local",
+  qdrant_host: "localhost",
+  qdrant_port: 6333,
+  redis_host: "localhost",
+  redis_port: 6379,
+  blob_storage_path: "./storage/blobs",
+  worker_job_timeout: 300,
+  log_output: false,
+  purdue_api_key_set: false,
+  anthropic_api_key_set: false,
+  openai_api_key_set: false,
+};
+
+const LOCAL_STORAGE_KEY = "dev-page-config";
+
 export function ConfigSection() {
-  const [config, setConfig] = useState<ConfigValues | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [config, setConfig] = useState<ConfigValues>(DEFAULT_DEV_CONFIG);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
-  const loadConfig = async () => {
-    setLoading(true);
-    try {
-      const response = await api.getConfig();
-      setConfig(response.config);
-    } catch (error) {
-      console.error("Failed to load config:", error);
-      setMessage({
-        type: "error",
-        text: error instanceof ApiClientError ? error.message : "Failed to load config",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
+  // Load config from localStorage on mount
   useEffect(() => {
-    loadConfig();
+    const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (stored) {
+      try {
+        setConfig(JSON.parse(stored));
+      } catch (error) {
+        console.error("Failed to load dev config:", error);
+      }
+    }
   }, []);
 
-  const handleSave = async () => {
-    if (!config) return;
-
-    setSaving(true);
-    setMessage(null);
-
+  const handleSave = () => {
     try {
-      const updates: any = {};
-      
-      // Send all configurable values (including false booleans and empty strings)
-      // Only skip undefined/null values
-      if (config.provider_name !== undefined) updates.provider_name = config.provider_name;
-      if (config.model_ollama !== undefined) updates.model_ollama = config.model_ollama;
-      if (config.model_purdue !== undefined) updates.model_purdue = config.model_purdue;
-      if (config.model_anthropic !== undefined) updates.model_anthropic = config.model_anthropic;
-      if (config.chat_context_enabled !== undefined) updates.chat_context_enabled = config.chat_context_enabled;
-      if (config.chat_library_enabled !== undefined) updates.chat_library_enabled = config.chat_library_enabled;
-      if (config.chat_library_top_k !== undefined) updates.chat_library_top_k = config.chat_library_top_k;
-      if (config.chat_library_similarity_threshold !== undefined) updates.chat_library_similarity_threshold = config.chat_library_similarity_threshold;
-      if (config.chat_journal_enabled !== undefined) updates.chat_journal_enabled = config.chat_journal_enabled;
-      if (config.chat_journal_top_k !== undefined) updates.chat_journal_top_k = config.chat_journal_top_k;
-      if (config.library_chunk_size !== undefined) updates.library_chunk_size = config.library_chunk_size;
-      if (config.library_chunk_overlap !== undefined) updates.library_chunk_overlap = config.library_chunk_overlap;
-      if (config.embedding_model !== undefined) updates.embedding_model = config.embedding_model;
-      if (config.log_output !== undefined) updates.log_output = config.log_output;
-
-      const response = await api.updateConfig(updates);
-      
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(config));
       setMessage({
         type: "success",
-        text: response.message,
+        text: "Dev config saved locally",
       });
-      
-      // Reload config to get any server-side adjustments
-      await loadConfig();
+      setTimeout(() => setMessage(null), 3000);
     } catch (error) {
       setMessage({
         type: "error",
-        text: error instanceof ApiClientError ? error.message : "Failed to update config",
+        text: "Failed to save dev config",
       });
-    } finally {
-      setSaving(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-800">
-        <div className="flex items-center justify-center p-8">
-          <RefreshCw className="h-6 w-6 animate-spin text-zinc-400" />
-        </div>
-      </div>
-    );
-  }
-
-  if (!config) {
-    return (
-      <div className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-700 dark:bg-zinc-800">
-        <p className="text-sm text-zinc-500 dark:text-zinc-400">
-          Failed to load configuration
-        </p>
-      </div>
-    );
-  }
+  const handleReset = () => {
+    setConfig(DEFAULT_DEV_CONFIG);
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
+    setMessage({
+      type: "success",
+      text: "Reset to default dev config",
+    });
+    setTimeout(() => setMessage(null), 3000);
+  };
 
   return (
     <div className="rounded-lg border border-zinc-200 bg-white dark:border-zinc-700 dark:bg-zinc-800">
       <div className="flex items-center justify-between border-b border-zinc-200 p-4 dark:border-zinc-700">
         <div className="flex items-center gap-2">
           <Settings className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-          <h3 className="font-medium text-zinc-900 dark:text-zinc-50">Configuration</h3>
+          <h3 className="font-medium text-zinc-900 dark:text-zinc-50">Dev Configuration</h3>
+          <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+            Local Only
+          </span>
         </div>
       </div>
 
@@ -301,7 +290,7 @@ export function ConfigSection() {
           <input
             type="text"
             value={config.embedding_model || ""}
-            placeholder="bge-m3"
+            placeholder="nomic-embed-text"
             onChange={(e) => setConfig({ ...config, embedding_model: e.target.value })}
             className="w-full rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-900 placeholder-zinc-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-50 dark:placeholder-zinc-500"
           />
@@ -321,7 +310,7 @@ export function ConfigSection() {
         {/* Action Buttons */}
         <div className="flex gap-2">
           <button
-            onClick={loadConfig}
+            onClick={handleReset}
             className="flex flex-1 items-center justify-center gap-2 rounded-lg border border-zinc-300 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
           >
             <RotateCcw className="h-4 w-4" />
@@ -329,20 +318,10 @@ export function ConfigSection() {
           </button>
           <button
             onClick={handleSave}
-            disabled={saving}
-            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-blue-500 dark:hover:bg-blue-600"
+            className="flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
           >
-            {saving ? (
-              <>
-                <RefreshCw className="h-4 w-4 animate-spin" />
-                <span>Saving...</span>
-              </>
-            ) : (
-              <>
-                <Save className="h-4 w-4" />
-                <span>Save</span>
-              </>
-            )}
+            <Save className="h-4 w-4" />
+            <span>Save</span>
           </button>
         </div>
       </div>
@@ -350,3 +329,17 @@ export function ConfigSection() {
   );
 }
 
+// Export function to get current dev config for ChatBox
+export function getDevConfig(): ConfigValues {
+  if (typeof window === "undefined") return DEFAULT_DEV_CONFIG;
+  
+  const stored = localStorage.getItem(LOCAL_STORAGE_KEY);
+  if (stored) {
+    try {
+      return JSON.parse(stored);
+    } catch (error) {
+      console.error("Failed to load dev config:", error);
+    }
+  }
+  return DEFAULT_DEV_CONFIG;
+}

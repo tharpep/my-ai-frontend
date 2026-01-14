@@ -1,6 +1,7 @@
 "use client";
 
 import { MessageSquare, Clock, Zap, TrendingUp, Calendar, FileText } from "lucide-react";
+import { AppShell } from "@/components/layout/AppShell";
 
 export default function AnalyticsPage() {
   // Mock data
@@ -8,8 +9,7 @@ export default function AnalyticsPage() {
   const maxUsage = Math.max(...dailyUsage);
 
   return (
-    <div className="h-full overflow-y-auto bg-zinc-950 p-6">
-      <div className="mx-auto max-w-7xl">
+    <AppShell maxWidth="7xl">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-zinc-100">Analytics</h1>
@@ -167,7 +167,6 @@ export default function AnalyticsPage() {
             </div>
           </div>
         </div>
-      </div>
-    </div>
+    </AppShell>
   );
 }

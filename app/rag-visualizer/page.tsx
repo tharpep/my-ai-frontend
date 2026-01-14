@@ -1,281 +1,263 @@
 "use client";
 
-import { useState } from "react";
-import { Network, FileText, MessageSquare, Search, Filter, Zap, TrendingUp } from "lucide-react";
-
-// Placeholder data for visualization
-const mockDocuments = [
-  { id: "doc1", name: "Project Requirements.pdf", chunks: 24, connections: 18, color: "blue" },
-  { id: "doc2", name: "API Documentation.md", chunks: 45, connections: 32, color: "green" },
-  { id: "doc3", name: "Meeting Notes.txt", chunks: 12, connections: 8, color: "purple" },
-  { id: "doc4", name: "Research Paper.pdf", chunks: 67, connections: 41, color: "orange" },
-  { id: "doc5", name: "Code Guidelines.md", chunks: 28, connections: 15, color: "pink" },
-];
-
-const mockConnections = [
-  { from: "doc1", to: "doc2", strength: 0.8 },
-  { from: "doc1", to: "doc3", strength: 0.6 },
-  { from: "doc2", to: "doc4", strength: 0.9 },
-  { from: "doc3", to: "doc5", strength: 0.5 },
-  { from: "doc4", to: "doc5", strength: 0.7 },
-];
-
-const mockChats = [
-  { id: "chat1", name: "API Integration Help", docs: ["doc1", "doc2"], chunks: 8 },
-  { id: "chat2", name: "Code Review Discussion", docs: ["doc2", "doc5"], chunks: 12 },
-  { id: "chat3", name: "Research Analysis", docs: ["doc4"], chunks: 15 },
-];
+import { useState, useEffect } from "react";
+import { AppShell } from "@/components/layout/AppShell";
+import { api, StatsResponse, IndexedStatsResponse, MemoryStatsResponse, ApiClientError } from "@/lib/api";
+import { Database, RefreshCw, BarChart3, Activity, HardDrive, Loader2, FileText, History } from "lucide-react";
 
 export default function RAGVisualizerPage() {
-  const [selectedDoc, setSelectedDoc] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"network" | "heatmap">("network");
+  const [ragStats, setRagStats] = useState<StatsResponse | null>(null);
+  const [indexedStats, setIndexedStats] = useState<IndexedStatsResponse | null>(null);
+  const [memoryStats, setMemoryStats] = useState<MemoryStatsResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const selectedDocData = mockDocuments.find(d => d.id === selectedDoc);
+  const loadStats = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const [ragData, indexedData, memoryData] = await Promise.all([
+        api.getStats().catch(() => null),
+        api.getIndexedStats().catch(() => null),
+        api.getMemoryStats().catch(() => null),
+      ]);
+
+      setRagStats(ragData);
+      setIndexedStats(indexedData);
+      setMemoryStats(memoryData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to load statistics");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadStats();
+    const interval = setInterval(loadStats, 10000); // Poll every 10 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatNumber = (num: number | undefined): string => {
+    if (num === undefined || num === null) return "N/A";
+    return num.toLocaleString();
+  };
 
   return (
-    <div className="h-full overflow-y-auto bg-zinc-950 p-6">
-      <div className="mx-auto max-w-7xl">
+    <AppShell maxWidth="7xl">
+      
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-zinc-100">RAG Visualizer</h1>
-          <p className="mt-2 text-zinc-400">
-            Explore document relationships and RAG performance
-          </p>
-        </div>
-
-        {/* Stats Overview */}
-        <div className="mb-8 grid gap-4 md:grid-cols-4">
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-blue-950/30 p-2">
-                <FileText className="h-5 w-5 text-blue-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-zinc-100">{mockDocuments.length}</p>
-                <p className="text-xs text-zinc-500">Documents</p>
-              </div>
-            </div>
+        <div className="mb-8 flex items-start justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-zinc-100">RAG Visualizer</h1>
+            <p className="mt-2 text-zinc-400">
+              Monitor your RAG system&apos;s performance and statistics
+            </p>
           </div>
-
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-green-950/30 p-2">
-                <Zap className="h-5 w-5 text-green-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-zinc-100">176</p>
-                <p className="text-xs text-zinc-500">Total Chunks</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-purple-950/30 p-2">
-                <Network className="h-5 w-5 text-purple-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-zinc-100">114</p>
-                <p className="text-xs text-zinc-500">Connections</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-            <div className="flex items-center gap-3">
-              <div className="rounded-lg bg-orange-950/30 p-2">
-                <TrendingUp className="h-5 w-5 text-orange-400" />
-              </div>
-              <div>
-                <p className="text-2xl font-bold text-zinc-100">87%</p>
-                <p className="text-xs text-zinc-500">Avg Relevance</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* View Mode Toggle */}
-        <div className="mb-6 flex items-center gap-4">
-          <div className="flex rounded-lg border border-zinc-800 bg-zinc-900 p-1">
-            <button
-              onClick={() => setViewMode("network")}
-              className={`rounded px-4 py-2 text-sm font-medium transition-colors ${
-                viewMode === "network"
-                  ? "bg-blue-600 text-white"
-                  : "text-zinc-400 hover:text-zinc-100"
-              }`}
-            >
-              Network View
-            </button>
-            <button
-              onClick={() => setViewMode("heatmap")}
-              className={`rounded px-4 py-2 text-sm font-medium transition-colors ${
-                viewMode === "heatmap"
-                  ? "bg-blue-600 text-white"
-                  : "text-zinc-400 hover:text-zinc-100"
-              }`}
-            >
-              Usage Heatmap
-            </button>
-          </div>
-
-          <div className="flex-1" />
-
-          <button className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-900 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-800">
-            <Filter className="h-4 w-4" />
-            Filter
+          <button
+            onClick={loadStats}
+            disabled={loading}
+            className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 text-sm text-zinc-300 hover:bg-zinc-700 disabled:opacity-50"
+          >
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
           </button>
         </div>
 
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Visualization Area */}
-          <div className="lg:col-span-2">
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-6">
-              {viewMode === "network" ? (
-                <div className="relative aspect-video">
-                  {/* Network Graph Placeholder */}
-                  <div className="flex h-full items-center justify-center">
-                    <div className="relative h-full w-full">
-                      {/* Nodes */}
-                      {mockDocuments.map((doc, i) => (
-                        <button
-                          key={doc.id}
-                          onClick={() => setSelectedDoc(doc.id)}
-                          className={`absolute flex h-20 w-20 cursor-pointer items-center justify-center rounded-full border-2 transition-all hover:scale-110 ${
-                            selectedDoc === doc.id
-                              ? "border-blue-500 bg-blue-950 shadow-lg shadow-blue-500/50"
-                              : "border-zinc-700 bg-zinc-800 hover:border-zinc-600"
-                          }`}
-                          style={{
-                            left: `${20 + (i * 15)}%`,
-                            top: `${30 + (i % 3) * 20}%`,
-                          }}
-                        >
-                          <FileText className={`h-6 w-6 text-${doc.color}-400`} />
-                        </button>
-                      ))}
-
-                      {/* Connection Lines */}
-                      <svg className="absolute inset-0 h-full w-full">
-                        {mockConnections.map((conn, i) => {
-                          const fromIndex = mockDocuments.findIndex(d => d.id === conn.from);
-                          const toIndex = mockDocuments.findIndex(d => d.id === conn.to);
-                          return (
-                            <line
-                              key={i}
-                              x1={`${20 + (fromIndex * 15) + 5}%`}
-                              y1={`${30 + (fromIndex % 3) * 20 + 5}%`}
-                              x2={`${20 + (toIndex * 15) + 5}%`}
-                              y2={`${30 + (toIndex % 3) * 20 + 5}%`}
-                              stroke="rgb(63 63 70)"
-                              strokeWidth={conn.strength * 3}
-                              opacity={0.3}
-                            />
-                          );
-                        })}
-                      </svg>
-                    </div>
-                  </div>
-
-                  <div className="mt-4 text-center text-sm text-zinc-500">
-                    Click on nodes to see details • Line thickness = connection strength
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <h3 className="text-sm font-semibold text-zinc-100">Document Usage in Chats</h3>
-                  {mockDocuments.map((doc) => (
-                    <div key={doc.id} className="flex items-center gap-3">
-                      <span className="w-32 truncate text-xs text-zinc-400">{doc.name}</span>
-                      <div className="flex-1 rounded-full bg-zinc-800">
-                        <div
-                          className={`h-2 rounded-full bg-${doc.color}-500`}
-                          style={{ width: `${(doc.connections / 50) * 100}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-zinc-500">{doc.connections} uses</span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+        {error && (
+          <div className="mb-6 rounded-lg bg-red-950/30 border border-red-800 p-4 text-sm text-red-100">
+            {error}
           </div>
+        )}
 
-          {/* Details Panel */}
-          <div className="space-y-4">
-            {/* Selected Document Info */}
-            {selectedDocData ? (
-              <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-                <h3 className="mb-3 flex items-center gap-2 text-sm font-semibold text-zinc-100">
-                  <FileText className="h-4 w-4" />
-                  {selectedDocData.name}
-                </h3>
-                <div className="space-y-2 text-xs">
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Chunks</span>
-                    <span className="font-medium text-zinc-300">{selectedDocData.chunks}</span>
+        {loading && !ragStats && !indexedStats && !memoryStats ? (
+          <div className="flex items-center justify-center py-20">
+            <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+            <span className="ml-3 text-lg text-zinc-400">Loading statistics...</span>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {/* Library Stats */}
+            {indexedStats && (
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-6">
+                <div className="mb-6 flex items-center gap-3">
+                  <FileText className="h-6 w-6 text-blue-400" />
+                  <h2 className="text-xl font-semibold text-zinc-100">
+                    Library (Documents)
+                  </h2>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                    <div className="flex items-center gap-2">
+                      <Activity className="h-4 w-4 text-blue-400" />
+                      <p className="text-xs text-zinc-400">Collection Name</p>
+                    </div>
+                    <p className="mt-2 text-lg font-bold text-zinc-100">
+                      {indexedStats.collection || "N/A"}
+                    </p>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Connections</span>
-                    <span className="font-medium text-zinc-300">{selectedDocData.connections}</span>
+
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                    <div className="flex items-center gap-2">
+                      <BarChart3 className="h-4 w-4 text-green-400" />
+                      <p className="text-xs text-zinc-400">Total Documents</p>
+                    </div>
+                    <p className="mt-2 text-lg font-bold text-zinc-100">
+                      {formatNumber(indexedStats.total_documents)}
+                    </p>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Avg Similarity</span>
-                    <span className="font-medium text-green-400">0.84</span>
+
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                    <div className="flex items-center gap-2">
+                      <Activity className="h-4 w-4 text-purple-400" />
+                      <p className="text-xs text-zinc-400">Vector Dimension</p>
+                    </div>
+                    <p className="mt-2 text-lg font-bold text-zinc-100">
+                      {formatNumber(indexedStats.vector_dimension)}
+                    </p>
                   </div>
-                  <div className="flex justify-between">
-                    <span className="text-zinc-500">Last Used</span>
-                    <span className="font-medium text-zinc-300">2 hours ago</span>
+
+                  <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                    <div className="flex items-center gap-2">
+                      <HardDrive className="h-4 w-4 text-orange-400" />
+                      <p className="text-xs text-zinc-400">Storage Type</p>
+                    </div>
+                    <p className="mt-2 text-lg font-bold text-zinc-100">
+                      {indexedStats.storage_type || "N/A"}
+                    </p>
                   </div>
                 </div>
-              </div>
-            ) : (
-              <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 text-center text-sm text-zinc-500">
-                Select a document to view details
               </div>
             )}
 
-            {/* Related Chats */}
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-              <h3 className="mb-3 text-sm font-semibold text-zinc-100">Recent RAG Usage</h3>
-              <div className="space-y-2">
-                {mockChats.map((chat) => (
-                  <div
-                    key={chat.id}
-                    className="rounded-lg border border-zinc-800 bg-zinc-800 p-3 transition-colors hover:border-zinc-700"
-                  >
-                    <div className="flex items-start gap-2">
-                      <MessageSquare className="h-4 w-4 flex-shrink-0 text-blue-400" />
-                      <div className="flex-1 min-w-0">
-                        <p className="truncate text-xs font-medium text-zinc-200">{chat.name}</p>
-                        <p className="mt-1 text-xs text-zinc-500">
-                          {chat.docs.length} docs • {chat.chunks} chunks used
+            {/* Journal Stats */}
+            {memoryStats && (
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-6">
+                <div className="mb-6 flex items-center gap-3">
+                  <History className="h-6 w-6 text-purple-400" />
+                  <h2 className="text-xl font-semibold text-zinc-100">
+                    Journal (Chat History)
+                  </h2>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  {memoryStats.journal_available !== false && memoryStats.qdrant && (
+                    <>
+                      <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                        <div className="flex items-center gap-2">
+                          <BarChart3 className="h-4 w-4 text-purple-400" />
+                          <p className="text-xs text-zinc-400">Journal Points</p>
+                        </div>
+                        <p className="mt-2 text-lg font-bold text-zinc-100">
+                          {formatNumber((memoryStats.qdrant as any)?.points_count)}
                         </p>
                       </div>
+
+                      <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                        <div className="flex items-center gap-2">
+                          <Activity className="h-4 w-4 text-green-400" />
+                          <p className="text-xs text-zinc-400">Total Sessions</p>
+                        </div>
+                        <p className="mt-2 text-lg font-bold text-zinc-100">
+                          {formatNumber(memoryStats.sessions?.total)}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                        <div className="flex items-center gap-2">
+                          <Database className="h-4 w-4 text-amber-400" />
+                          <p className="text-xs text-zinc-400">Needs Ingestion</p>
+                        </div>
+                        <p className="mt-2 text-lg font-bold text-zinc-100">
+                          {formatNumber(memoryStats.sessions?.needing_ingest)}
+                        </p>
+                      </div>
+
+                      <div className="rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                        <div className="flex items-center gap-2">
+                          <HardDrive className="h-4 w-4 text-blue-400" />
+                          <p className="text-xs text-zinc-400">Status</p>
+                        </div>
+                        <p className="mt-2 text-lg font-bold text-zinc-100">
+                          {memoryStats.initialized ? "Active" : "Inactive"}
+                        </p>
+                      </div>
+                    </>
+                  )}
+                  
+                  {memoryStats.journal_available === false && (
+                    <div className="col-span-full rounded-lg border border-zinc-800 bg-zinc-950 p-4">
+                      <p className="text-sm text-zinc-400">
+                        Journal system not available. RAG may be disabled.
+                      </p>
+                      {memoryStats.sessions && (
+                        <p className="mt-2 text-sm text-zinc-500">
+                          Total Sessions: {formatNumber(memoryStats.total_sessions)}
+                        </p>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* RAG System Stats */}
+            {ragStats && (
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-6">
+                <div className="mb-6 flex items-center gap-3">
+                  <BarChart3 className="h-6 w-6 text-blue-400" />
+                  <h2 className="text-xl font-semibold text-zinc-100">
+                    RAG System Statistics
+                  </h2>
+                </div>
+
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                  {Object.entries(ragStats)
+                    .filter(([key]) => key !== "request_id")
+                    .map(([key, value]) => (
+                      <div
+                        key={key}
+                        className="flex items-center justify-between rounded-lg border border-zinc-800 bg-zinc-950 p-4"
+                      >
+                        <span className="text-sm text-zinc-400 capitalize">
+                          {key.replace(/_/g, " ")}
+                        </span>
+                        <span className="text-base font-semibold text-zinc-100 font-mono">
+                          {typeof value === "object" && value !== null
+                            ? JSON.stringify(value)
+                            : String(value)}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Placeholder for Future Visualizations */}
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-6">
+              <h2 className="mb-4 text-xl font-semibold text-zinc-100">
+                Advanced Visualizations
+              </h2>
+              <div className="rounded-lg border-2 border-dashed border-zinc-800 bg-zinc-950 p-12 text-center">
+                <BarChart3 className="mx-auto h-12 w-12 text-zinc-700" />
+                <p className="mt-4 text-zinc-500">
+                  Document relationship graphs and usage heatmaps coming soon
+                </p>
               </div>
             </div>
 
-            {/* Top Performing Chunks */}
-            <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-4">
-              <h3 className="mb-3 text-sm font-semibold text-zinc-100">Top Performing Chunks</h3>
-              <div className="space-y-2">
-                {[
-                  { doc: "API Documentation.md", score: 0.94 },
-                  { doc: "Research Paper.pdf", score: 0.91 },
-                  { doc: "Project Requirements.pdf", score: 0.88 },
-                ].map((chunk, i) => (
-                  <div key={i} className="flex items-center justify-between text-xs">
-                    <span className="truncate text-zinc-400">{chunk.doc}</span>
-                    <span className="font-mono font-medium text-green-400">{chunk.score}</span>
-                  </div>
-                ))}
+            {!ragStats && !indexedStats && !memoryStats && !error && (
+              <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-12 text-center">
+                <p className="text-zinc-400">No statistics available</p>
+                <p className="mt-2 text-sm text-zinc-500">
+                  Make sure the backend is running at http://localhost:8000
+                </p>
               </div>
-            </div>
+            )}
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

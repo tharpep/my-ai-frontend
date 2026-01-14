@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AppShell } from "@/components/layout/AppShell";
 import { usePromptsStore } from "@/stores/promptsStore";
 import { Plus, Star, Trash2, Edit2, Copy, Search, Filter } from "lucide-react";
 
@@ -70,8 +71,8 @@ export default function PromptsPage() {
   };
 
   return (
-    <div className="h-full overflow-y-auto bg-zinc-950 p-6">
-      <div className="mx-auto max-w-6xl">
+    <AppShell maxWidth="7xl">
+      
         {/* Header */}
         <div className="mb-8 flex items-start justify-between">
           <div>

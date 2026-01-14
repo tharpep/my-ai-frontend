@@ -5,6 +5,17 @@
 @theme {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Design Tokens - Spacing */
+  --header-height: 3rem; /* 48px */
+  --status-bar-height: 2rem; /* 32px */
+  --page-padding-mobile: 1rem; /* 16px */
+  --page-padding-desktop: 1.5rem; /* 24px */
+
+  /* Design Tokens - Max Widths */
+  --max-width-chat: 48rem; /* 768px - optimal reading width */
+  --max-width-forms: 56rem; /* 896px - comfortable form width */
+  --max-width-dashboard: 80rem; /* 1280px - full dashboard layouts */
 }
 
 /* Light mode (default) */
@@ -22,5 +33,29 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), system-ui, -apple-system, sans-serif;
+}
+
+/* Smooth scrolling for better UX */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom scrollbar for dark mode */
+.dark ::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.dark ::-webkit-scrollbar-track {
+  background: #18181b; /* zinc-900 */
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: #3f3f46; /* zinc-700 */
+  border-radius: 4px;
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: #52525b; /* zinc-600 */
 }

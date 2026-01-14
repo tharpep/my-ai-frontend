@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useChatStore } from "@/stores/chatStore";
 import { ChatMessage } from "./ChatMessage";
-import { MessageSquare } from "lucide-react";
+import { MessageSquare, AlertCircle, X } from "lucide-react";
 
 /**
  * Chat Messages - Displays message history with auto-scroll
@@ -11,7 +11,7 @@ import { MessageSquare } from "lucide-react";
  * ChatGPT-style message flow
  */
 export function ChatMessages() {
-  const { getCurrentMessages, isLoading } = useChatStore();
+  const { getCurrentMessages, isLoading, error, setError } = useChatStore();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -29,6 +29,22 @@ export function ChatMessages() {
       ref={containerRef}
       className="h-full overflow-y-auto"
     >
+      {/* Error Banner */}
+      {error && (
+        <div className="sticky top-0 z-10 mx-auto max-w-3xl px-4 pt-4">
+          <div className="flex items-center gap-3 rounded-lg border border-red-800 bg-red-950/30 p-3 text-red-100">
+            <AlertCircle className="h-5 w-5 flex-shrink-0" />
+            <p className="flex-1 text-sm">{error}</p>
+            <button
+              onClick={() => setError(null)}
+              className="flex-shrink-0 rounded p-1 text-red-300 hover:bg-red-900/30"
+              aria-label="Dismiss error"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
       <div className="mx-auto max-w-3xl px-4 py-8">
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center text-center">

@@ -108,6 +108,7 @@ export interface ChatCompletionRequest {
   library_top_k?: number;
   journal_top_k?: number;
   session_id?: string;
+  save_messages?: boolean;
   system_prompt?: string;
   context_prompt_template?: string;
 }
@@ -283,12 +284,21 @@ export interface ConfigValues {
   chat_library_use_cache: boolean;
   chat_journal_enabled: boolean;
   chat_journal_top_k: number;
+  chat_journal_similarity_threshold?: number;
   library_collection_name: string;
   library_chunk_size: number;
   library_chunk_overlap: number;
+  journal_chunk_size?: number;
+  journal_chunk_overlap?: number;
   storage_use_persistent: boolean;
   embedding_model: string;
   hardware_mode: string;
+  hybrid_sparse_weight?: number;
+  rerank_enabled?: boolean;
+  rerank_candidates?: number;
+  rerank_model?: string;
+  query_expansion_enabled?: boolean;
+  query_expansion_model?: string;
   qdrant_host: string;
   qdrant_port: number;
   redis_host: string;
@@ -319,9 +329,22 @@ export interface ConfigUpdateRequest {
   chat_library_similarity_threshold?: number;
   chat_journal_enabled?: boolean;
   chat_journal_top_k?: number;
+  chat_journal_similarity_threshold?: number;
   library_chunk_size?: number;
   library_chunk_overlap?: number;
+  journal_chunk_size?: number;
+  journal_chunk_overlap?: number;
   embedding_model?: string;
+  // Hybrid Search
+  hybrid_sparse_weight?: number;
+  // Reranking
+  rerank_enabled?: boolean;
+  rerank_candidates?: number;
+  rerank_model?: string;
+  // Query Expansion
+  query_expansion_enabled?: boolean;
+  query_expansion_model?: string;
+  // Infrastructure
   qdrant_host?: string;
   qdrant_port?: number;
   redis_host?: string;
@@ -387,25 +410,80 @@ export interface SessionMetadata {
   name?: string;
   message_count: number;
   last_activity: string;
+  created_at?: string;
+  ingested_at?: string;
+}
+
+/** Session message */
+export interface SessionMessage {
+  role: "user" | "assistant" | "system";
+  content: string;
+  timestamp: string;
+}
+
+/** Ingestion status */
+export interface IngestionStatus {
+  ingested: boolean;
+  ingested_at?: string;
+  has_new_messages: boolean;
+  chunk_count: number;
+}
+
+/** Session with messages response */
+export interface SessionWithMessagesResponse {
+  session_id: string;
+  name?: string;
+  created_at: string;
+  last_activity: string;
+  message_count: number;
+  ingestion_status: IngestionStatus;
+  messages: SessionMessage[];
+  request_id: string;
 }
 
 /** List sessions response */
 export interface ListSessionsResponse {
   sessions: SessionMetadata[];
   total: number;
+  request_id: string;
 }
 
 /** Delete session response */
 export interface DeleteSessionResponse {
   status: string;
   session_id: string;
+  request_id: string;
+}
+
+/** Ingest session response */
+export interface IngestSessionResponse {
+  status: string;
+  session_id: string;
+  chunks_created: number;
+  blob_path?: string;
+  ingested_at: string;
+  message_count: number;
+  request_id: string;
+}
+
+/** Session status response */
+export interface SessionStatusResponse extends IngestionStatus {
+  request_id: string;
 }
 
 /** Memory stats response */
 export interface MemoryStatsResponse {
-  initialized: boolean;
-  message?: string;
-  [key: string]: unknown;
+  initialized?: boolean;
+  journal_available?: boolean;
+  qdrant?: {
+    points_count?: number;
+    [key: string]: unknown;
+  };
+  sessions?: {
+    total: number;
+    needing_ingest: number;
+  };
+  request_id: string;
 }
 
 // ===== Error Handling =====
@@ -436,14 +514,14 @@ export class ApiClientError extends Error {
 /** Parse axios error into typed ApiClientError */
 function parseError(error: unknown): ApiClientError {
   const axiosError = error as AxiosError<ApiError>;
-  
+
   if (axiosError.response?.data?.error) {
     const errorData = axiosError.response.data.error;
     const message = errorData?.message ?? "Unknown error";
     const type = errorData?.type ?? "unknown_error";
     const code = errorData?.code ?? "unknown";
     const requestId = axiosError.response.data.request_id ?? "unknown";
-    
+
     return new ApiClientError(
       message,
       axiosError.response.status ?? 500,
@@ -747,11 +825,47 @@ export const api = {
     }
   },
 
+  /** Get a session with all its messages */
+  async getSessionMessages(sessionId: string): Promise<SessionWithMessagesResponse> {
+    try {
+      const response = await apiClient.get<SessionWithMessagesResponse>(
+        `/v1/memory/sessions/${encodeURIComponent(sessionId)}/messages`
+      );
+      return response.data;
+    } catch (error) {
+      throw parseError(error);
+    }
+  },
+
   /** Delete a chat session */
   async deleteSession(sessionId: string): Promise<DeleteSessionResponse> {
     try {
       const response = await apiClient.delete<DeleteSessionResponse>(
         `/v1/memory/sessions/${encodeURIComponent(sessionId)}`
+      );
+      return response.data;
+    } catch (error) {
+      throw parseError(error);
+    }
+  },
+
+  /** Manually ingest a session into journal RAG */
+  async ingestSession(sessionId: string): Promise<IngestSessionResponse> {
+    try {
+      const response = await apiClient.post<IngestSessionResponse>(
+        `/v1/memory/sessions/${encodeURIComponent(sessionId)}/ingest`
+      );
+      return response.data;
+    } catch (error) {
+      throw parseError(error);
+    }
+  },
+
+  /** Get session ingestion status */
+  async getSessionStatus(sessionId: string): Promise<SessionStatusResponse> {
+    try {
+      const response = await apiClient.get<SessionStatusResponse>(
+        `/v1/memory/sessions/${encodeURIComponent(sessionId)}/status`
       );
       return response.data;
     } catch (error) {
@@ -770,6 +884,9 @@ export const api = {
       throw parseError(error);
     }
   },
+
+  // ----- Journal Management -----
+  // Note: Journal stats are available via getMemoryStats() which returns qdrant stats
 };
 
 // ===== Exports =====

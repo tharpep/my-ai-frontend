@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { api, ApiClientError, ConfigValues, RAGContext } from "@/lib/api";
-import { Send, Loader2, MessageSquare, ChevronDown, ChevronUp, FileText, History } from "lucide-react";
+import { Send, Loader2, MessageSquare, ChevronDown, ChevronUp, FileText, History, RefreshCw } from "lucide-react";
 
 interface Message {
   role: "user" | "assistant";
@@ -123,14 +123,35 @@ function RAGContextDisplay({ context }: { context: RAGContext }) {
               </button>
               {expandedSection === "journal" && (
                 <div className="mt-2 space-y-2">
-                  {context.journal.entries.map((entry, idx) => (
+                  {context.journal.entries.map((entry: any, idx: number) => (
                     <div
                       key={idx}
                       className="rounded border border-zinc-200 bg-zinc-50 p-2 dark:border-zinc-700 dark:bg-zinc-900"
                     >
-                      <pre className="text-[10px] text-zinc-600 dark:text-zinc-400">
-                        {JSON.stringify(entry, null, 2)}
-                      </pre>
+                      <div className="mb-1 flex items-center justify-between">
+                        <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                          Entry {idx + 1}
+                        </span>
+                        {entry.similarity && (
+                          <span className="text-zinc-500 dark:text-zinc-400">
+                            Similarity: {(entry.similarity * 100).toFixed(1)}%
+                          </span>
+                        )}
+                        {entry.session_name && (
+                          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+                            {entry.session_name}
+                          </span>
+                        )}
+                      </div>
+                      {entry.text || entry.content ? (
+                        <p className="text-zinc-600 dark:text-zinc-400">
+                          {entry.text || entry.content}
+                        </p>
+                      ) : (
+                        <pre className="text-[10px] text-zinc-600 dark:text-zinc-400">
+                          {JSON.stringify(entry, null, 2)}
+                        </pre>
+                      )}
                     </div>
                   ))}
                   {context.journal.context_text && (
@@ -159,36 +180,36 @@ export function ChatBox() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [config, setConfig] = useState<ConfigValues | null>(null);
-  const [sessionId, setSessionId] = useState<string>("");
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
 
-  // Initialize session ID on client side only
+  // Load dev config from localStorage on mount
   useEffect(() => {
-    // Generate or retrieve session ID for Journal context
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem("chatSessionId");
-      if (stored) {
-        setSessionId(stored);
-      } else {
-        const newId = `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        localStorage.setItem("chatSessionId", newId);
-        setSessionId(newId);
-      }
-    }
-  }, []);
-
-  // Load config on mount
-  useEffect(() => {
-    const loadConfig = async () => {
+    const loadDevConfig = () => {
       try {
-        const response = await api.getConfig();
-        setConfig(response.config);
+        const stored = localStorage.getItem("dev-page-config");
+        if (stored) {
+          setConfig(JSON.parse(stored));
+        }
       } catch (error) {
-        console.error("Failed to load config for chat:", error);
+        console.error("Failed to load dev config for chat:", error);
       }
     };
-    loadConfig();
+    loadDevConfig();
+    
+    // Listen for config changes (when user saves in ConfigSection)
+    const handleStorageChange = () => {
+      loadDevConfig();
+    };
+    window.addEventListener("storage", handleStorageChange);
+    
+    // Also listen for custom event for same-tab updates
+    window.addEventListener("devConfigChanged", handleStorageChange);
+    
+    return () => {
+      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("devConfigChanged", handleStorageChange);
+    };
   }, []);
 
   const scrollToBottom = () => {
@@ -228,7 +249,8 @@ export function ChatBox() {
         use_journal: useJournal ?? undefined,
         library_top_k: config?.chat_library_top_k ?? undefined,
         journal_top_k: config?.chat_journal_top_k ?? undefined,
-        session_id: useJournal ? sessionId : undefined,
+        // No session_id - dev page doesn't save messages
+        save_messages: false, // Explicitly don't save messages
       });
 
       const assistantMessage: Message = {
@@ -268,15 +290,27 @@ export function ChatBox() {
               Context
             </span>
           )}
+          <button
+            onClick={() => {
+              setMessages([]);
+              setError(null);
+            }}
+            className="rounded-lg p-1 text-zinc-500 hover:bg-zinc-100 hover:text-zinc-700 dark:text-zinc-400 dark:hover:bg-zinc-700 dark:hover:text-zinc-200"
+            title="Clear chat"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+          </button>
         </div>
         {config && (
-          <div className="flex gap-1 text-xs text-zinc-500 dark:text-zinc-400">
-            {config.chat_library_enabled && (
-              <span className="rounded bg-zinc-100 px-1.5 py-0.5 dark:bg-zinc-700">Library</span>
-            )}
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1 text-xs text-zinc-500 dark:text-zinc-400">
+              {config.chat_library_enabled && (
+                <span className="rounded bg-zinc-100 px-1.5 py-0.5 dark:bg-zinc-700">Library</span>
+              )}
             {config.chat_journal_enabled && (
               <span className="rounded bg-zinc-100 px-1.5 py-0.5 dark:bg-zinc-700">Journal</span>
             )}
+          </div>
           </div>
         )}
       </div>

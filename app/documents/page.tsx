@@ -1,75 +1,160 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { useDocumentStore } from "@/stores/documentStore";
-import { api, ApiClientError } from "@/lib/api";
-import { Upload, FileText, Trash2, CheckCircle, XCircle, Loader2, AlertCircle } from "lucide-react";
+import { useState, useCallback, useEffect, useRef } from "react";
+import { api, ApiClientError, BlobInfo } from "@/lib/api";
+import { Upload, FileText, Trash2, CheckCircle, XCircle, Loader2, AlertCircle, RefreshCw, Database, Search, Grid3x3, List } from "lucide-react";
 import { useDropzone } from "react-dropzone";
+import { AppShell } from "@/components/layout/AppShell";
+
+interface UploadingFile {
+  filename: string;
+  status: 'uploading' | 'processing' | 'complete' | 'failed';
+  error?: string;
+  jobId?: string;
+}
 
 export default function DocumentsPage() {
-  const { documents, addDocument, updateDocument, removeDocument, setError, error } = useDocumentStore();
-  const [uploadingFiles, setUploadingFiles] = useState<Set<string>>(new Set());
+  const [documents, setDocuments] = useState<BlobInfo[]>([]);
+  const [uploadingFiles, setUploadingFiles] = useState<Map<string, UploadingFile>>(new Map());
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [indexedStats, setIndexedStats] = useState<any>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load existing documents
+  const loadDocuments = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const [blobsResponse, statsResponse] = await Promise.all([
+        api.listBlobs(),
+        api.getIndexedStats().catch(() => null),
+      ]);
+      
+      setDocuments(blobsResponse.blobs);
+      setIndexedStats(statsResponse);
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : "Failed to load documents");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
+
+  const pollJobStatus = async (jobId: string, filename: string) => {
+    const maxAttempts = 30;
+    let attempts = 0;
+
+    const poll = async () => {
+      if (attempts >= maxAttempts) {
+        setUploadingFiles(prev => {
+          const next = new Map(prev);
+          next.set(filename, {
+            filename,
+            status: 'failed',
+            error: 'Processing timeout',
+          });
+          return next;
+        });
+        return;
+      }
+
+      try {
+        const status = await api.getJobStatus(jobId);
+        
+        if (status.status === 'completed') {
+          setUploadingFiles(prev => {
+            const next = new Map(prev);
+            next.set(filename, {
+              filename,
+              status: 'complete',
+            });
+            return next;
+          });
+          
+          // Reload documents after completion
+          setTimeout(() => {
+            loadDocuments();
+            setUploadingFiles(prev => {
+              const next = new Map(prev);
+              next.delete(filename);
+              return next;
+            });
+          }, 1000);
+        } else if (status.status === 'failed') {
+          setUploadingFiles(prev => {
+            const next = new Map(prev);
+            next.set(filename, {
+              filename,
+              status: 'failed',
+              error: status.error || 'Processing failed',
+            });
+            return next;
+          });
+        } else {
+          // Still processing
+          setUploadingFiles(prev => {
+            const next = new Map(prev);
+            next.set(filename, {
+              filename,
+              status: 'processing',
+              jobId,
+            });
+            return next;
+          });
+          attempts++;
+          setTimeout(poll, 1000);
+        }
+      } catch (err) {
+        setUploadingFiles(prev => {
+          const next = new Map(prev);
+          next.set(filename, {
+            filename,
+            status: 'failed',
+            error: err instanceof ApiClientError ? err.message : 'Status check failed',
+          });
+          return next;
+        });
+      }
+    };
+
+    poll();
+  };
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     setError(null);
 
     for (const file of acceptedFiles) {
-      const docId = `${file.name}-${Date.now()}`;
-      
-      // Add to store with uploading status
-      addDocument({
-        id: docId,
+      setUploadingFiles(prev => new Map(prev).set(file.name, {
         filename: file.name,
-        size: file.size,
-        type: file.type,
         status: 'uploading',
-        uploadedAt: Date.now(),
-      });
-
-      setUploadingFiles(prev => new Set(prev).add(docId));
+      }));
 
       try {
-        // Upload to backend
         const response = await api.uploadDocument(file);
         
-        // Update status to processing
-        updateDocument(docId, { 
-          status: 'processing',
-        });
-
-        // Poll for completion (simplified - in production use webhooks or SSE)
-        setTimeout(() => {
-          updateDocument(docId, { 
-            status: 'indexed',
-            metadata: {
-              chunks: Math.floor(Math.random() * 50) + 10, // Placeholder
-            }
-          });
-          setUploadingFiles(prev => {
-            const next = new Set(prev);
-            next.delete(docId);
-            return next;
-          });
-        }, 2000);
+        // Start polling for job completion
+        pollJobStatus(response.job_id, file.name);
 
       } catch (err) {
         const errorMessage = err instanceof ApiClientError
           ? err.message
           : "Failed to upload document";
         
-        updateDocument(docId, { 
+        setUploadingFiles(prev => new Map(prev).set(file.name, {
+          filename: file.name,
           status: 'failed',
           error: errorMessage,
-        });
-        
-        setUploadingFiles(prev => {
-          const next = new Set(prev);
-          next.delete(docId);
-          return next;
-        });
+        }));
       }
     }
-  }, [addDocument, updateDocument, setError]);
+  }, []);
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop,
@@ -79,14 +164,43 @@ export default function DocumentsPage() {
       'text/markdown': ['.md'],
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
     },
+    noClick: true,
+    noKeyboard: true,
   });
 
-  const handleDelete = async (docId: string) => {
+  const handleUploadClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      await onDrop(Array.from(files));
+      e.target.value = ''; // Reset input
+    }
+  };
+
+  // Filter documents based on search
+  const filteredDocuments = documents.filter(doc =>
+    doc.original_filename.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleDelete = async (blobId: string) => {
     if (!confirm("Delete this document? It will be removed from your library.")) return;
     
     try {
-      // In production, call API to delete from backend
-      removeDocument(docId);
+      await api.deleteBlob(blobId);
+      setDocuments(prev => prev.filter(doc => doc.blob_id !== blobId));
+      
+      // Also delete from indexed collection
+      try {
+        await api.deleteIndexedFile(blobId);
+      } catch (err) {
+        console.warn("Failed to delete from index:", err);
+      }
+      
+      // Reload stats
+      loadDocuments();
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : "Failed to delete document");
     }
@@ -97,7 +211,7 @@ export default function DocumentsPage() {
       case 'uploading':
       case 'processing':
         return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
-      case 'indexed':
+      case 'complete':
         return <CheckCircle className="h-4 w-4 text-green-500" />;
       case 'failed':
         return <XCircle className="h-4 w-4 text-red-500" />;
@@ -112,111 +226,250 @@ export default function DocumentsPage() {
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString() + ' ' + date.toLocaleTimeString();
+  };
+
   return (
-    <div className="h-full overflow-y-auto bg-zinc-950 p-6">
-      <div className="mx-auto max-w-6xl">
+    <AppShell maxWidth="6xl">
+      <div {...getRootProps()} className="relative">
+        <input {...getInputProps()} />
+
+        {/* Drag Overlay */}
+        {isDragActive && (
+          <div className="absolute inset-0 z-50 flex items-center justify-center rounded-lg border-2 border-dashed border-blue-500 bg-blue-950/20 backdrop-blur-sm">
+            <div className="text-center">
+              <Upload className="mx-auto h-16 w-16 text-blue-400" />
+              <p className="mt-4 text-lg font-semibold text-blue-100">Drop files here</p>
+              <p className="mt-1 text-sm text-blue-300">PDF, TXT, MD, DOCX</p>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-zinc-100">Documents</h1>
-          <p className="mt-2 text-zinc-400">
-            Upload and manage documents for your AI assistant's knowledge base
-          </p>
+        <div className="mb-6">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <h1 className="text-3xl font-bold text-zinc-100">Documents</h1>
+              <p className="mt-2 text-zinc-400">
+                Upload and manage documents for your AI assistant&apos;s knowledge base
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadDocuments}
+                disabled={loading}
+                className="flex items-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-700 disabled:opacity-50 transition-colors"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+              <button
+                onClick={handleUploadClick}
+                className="flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 transition-colors"
+              >
+                <Upload className="h-4 w-4" />
+                Upload
+              </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                multiple
+                accept=".pdf,.txt,.md,.docx"
+                onChange={handleFileSelect}
+                className="hidden"
+              />
+            </div>
+          </div>
+
+          {/* Search and View Toggle */}
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-zinc-500" />
+              <input
+                type="text"
+                placeholder="Search documents..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full rounded-lg border border-zinc-700 bg-zinc-900 py-2 pl-10 pr-4 text-sm text-zinc-100 placeholder-zinc-500 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+              />
+            </div>
+            <div className="flex rounded-lg border border-zinc-700 bg-zinc-900">
+              <button
+                onClick={() => setViewMode("grid")}
+                className={`p-2 transition-colors ${
+                  viewMode === "grid"
+                    ? "bg-zinc-800 text-blue-400"
+                    : "text-zinc-500 hover:text-zinc-300"
+                }`}
+                aria-label="Grid view"
+              >
+                <Grid3x3 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setViewMode("list")}
+                className={`p-2 transition-colors ${
+                  viewMode === "list"
+                    ? "bg-zinc-800 text-blue-400"
+                    : "text-zinc-500 hover:text-zinc-300"
+                }`}
+                aria-label="List view"
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </div>
+
+        {/* Stats - Compact */}
+        {indexedStats && (
+          <div className="mb-6 flex items-center gap-6 rounded-lg border border-zinc-800 bg-zinc-900 px-4 py-3 text-xs">
+            <div className="flex items-center gap-2">
+              <Database className="h-4 w-4 text-blue-400" />
+              <span className="text-zinc-400">Documents:</span>
+              <span className="font-medium text-zinc-100">{indexedStats.total_documents || 0}</span>
+            </div>
+            <div className="h-4 w-px bg-zinc-800" />
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-400">Collection:</span>
+              <span className="font-medium text-zinc-100">{indexedStats.collection || 'N/A'}</span>
+            </div>
+            <div className="h-4 w-px bg-zinc-800" />
+            <div className="flex items-center gap-2">
+              <span className="text-zinc-400">Dimension:</span>
+              <span className="font-medium text-zinc-100">{indexedStats.vector_dimension || 'N/A'}</span>
+            </div>
+          </div>
+        )}
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 flex items-center gap-2 rounded-lg bg-red-950/30 p-4 text-red-100">
-            <AlertCircle className="h-5 w-5 flex-shrink-0" />
+          <div className="mb-6 flex items-center gap-2 rounded-lg bg-red-950/30 border border-red-800 p-3 text-red-100">
+            <AlertCircle className="h-4 w-4 flex-shrink-0" />
             <p className="text-sm">{error}</p>
           </div>
         )}
 
-        {/* Upload Dropzone */}
-        <div
-          {...getRootProps()}
-          className={`
-            mb-8 cursor-pointer rounded-lg border-2 border-dashed p-12 text-center transition-colors
-            ${
-              isDragActive
-                ? "border-blue-500 bg-blue-950/20"
-                : "border-zinc-700 hover:border-zinc-600 hover:bg-zinc-900/50"
-            }
-          `}
-        >
-          <input {...getInputProps()} />
-          <Upload className="mx-auto h-12 w-12 text-zinc-500" />
-          <h3 className="mt-4 text-lg font-semibold text-zinc-100">
-            {isDragActive ? "Drop files here" : "Upload Documents"}
-          </h3>
-          <p className="mt-2 text-sm text-zinc-400">
-            Drag and drop files here, or click to browse
-          </p>
-          <p className="mt-1 text-xs text-zinc-500">
-            Supports PDF, TXT, MD, DOCX
-          </p>
-        </div>
+        {/* Uploading Files */}
+        {uploadingFiles.size > 0 && (
+          <div className="mb-4">
+            <div className="space-y-2">
+              {Array.from(uploadingFiles.values()).map((file) => (
+                <div
+                  key={file.filename}
+                  className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2"
+                >
+                  {getStatusIcon(file.status)}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-zinc-100 truncate">{file.filename}</p>
+                  </div>
+                  <p className="text-xs text-zinc-500">
+                    {file.status === 'uploading' && "Uploading..."}
+                    {file.status === 'processing' && "Processing..."}
+                    {file.status === 'complete' && "Complete"}
+                    {file.status === 'failed' && "Failed"}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Document Library */}
         <div>
-          <h2 className="mb-4 text-xl font-semibold text-zinc-100">
-            Library ({documents.length})
+          <h2 className="mb-3 text-sm font-medium text-zinc-400">
+            {filteredDocuments.length} {filteredDocuments.length === 1 ? 'Document' : 'Documents'}
+            {searchQuery && ` matching "${searchQuery}"`}
           </h2>
 
-          {documents.length === 0 ? (
+          {loading && documents.length === 0 ? (
+            <div className="flex items-center justify-center py-20">
+              <Loader2 className="h-8 w-8 animate-spin text-blue-500" />
+              <p className="ml-3 text-zinc-400">Loading documents...</p>
+            </div>
+          ) : documents.length === 0 ? (
             <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-12 text-center">
               <FileText className="mx-auto h-12 w-12 text-zinc-600" />
               <p className="mt-4 text-zinc-400">No documents yet</p>
               <p className="mt-1 text-sm text-zinc-500">
-                Upload your first document to get started
+                Click Upload to add your first document
               </p>
             </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {documents.map((doc) => (
+          ) : filteredDocuments.length === 0 ? (
+            <div className="rounded-lg border border-zinc-800 bg-zinc-900 p-12 text-center">
+              <Search className="mx-auto h-12 w-12 text-zinc-600" />
+              <p className="mt-4 text-zinc-400">No documents found</p>
+              <p className="mt-1 text-sm text-zinc-500">
+                Try a different search term
+              </p>
+            </div>
+          ) : viewMode === "grid" ? (
+            <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
+              {filteredDocuments.map((doc) => (
                 <div
-                  key={doc.id}
-                  className="rounded-lg border border-zinc-800 bg-zinc-900 p-4 transition-colors hover:border-zinc-700"
+                  key={doc.blob_id}
+                  className="group rounded-lg border border-zinc-800 bg-zinc-900 p-3 transition-colors hover:border-zinc-700"
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-start gap-3 flex-1 min-w-0">
-                      {getStatusIcon(doc.status)}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-start gap-2 flex-1 min-w-0">
+                      <FileText className="h-4 w-4 flex-shrink-0 text-blue-400 mt-0.5" />
                       <div className="flex-1 min-w-0">
                         <h3 className="truncate text-sm font-medium text-zinc-100">
-                          {doc.filename}
+                          {doc.original_filename}
                         </h3>
-                        <p className="mt-1 text-xs text-zinc-500">
-                          {formatFileSize(doc.size)}
-                          {doc.metadata?.chunks && ` • ${doc.metadata.chunks} chunks`}
-                        </p>
-                        {doc.status === 'failed' && doc.error && (
-                          <p className="mt-1 text-xs text-red-400">{doc.error}</p>
-                        )}
+                        <div className="mt-1 flex items-center gap-2 text-xs text-zinc-500">
+                          <span>{formatFileSize(doc.size_bytes)}</span>
+                          <span>•</span>
+                          <span>{doc.file_extension.toUpperCase()}</span>
+                        </div>
                       </div>
                     </div>
-                    
+
                     <button
-                      onClick={() => handleDelete(doc.id)}
-                      className="flex-shrink-0 rounded p-1 text-zinc-500 hover:bg-zinc-800 hover:text-red-400"
+                      onClick={() => handleDelete(doc.blob_id)}
+                      className="flex-shrink-0 rounded p-1 text-zinc-500 opacity-0 transition-opacity hover:bg-zinc-800 hover:text-red-400 group-hover:opacity-100"
                       aria-label="Delete document"
                     >
-                      <Trash2 className="h-4 w-4" />
+                      <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
-
-                  <div className="mt-3">
-                    <div className="text-xs text-zinc-500">
-                      {doc.status === 'uploading' && "Uploading..."}
-                      {doc.status === 'processing' && "Processing..."}
-                      {doc.status === 'indexed' && "Ready"}
-                      {doc.status === 'failed' && "Failed"}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {filteredDocuments.map((doc) => (
+                <div
+                  key={doc.blob_id}
+                  className="group flex items-center justify-between gap-3 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-2 transition-colors hover:border-zinc-700"
+                >
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <FileText className="h-4 w-4 flex-shrink-0 text-blue-400" />
+                    <div className="flex-1 min-w-0">
+                      <h3 className="truncate text-sm font-medium text-zinc-100">
+                        {doc.original_filename}
+                      </h3>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-zinc-500">
+                      <span>{formatFileSize(doc.size_bytes)}</span>
+                      <span>{doc.file_extension.toUpperCase()}</span>
+                      <span className="hidden md:block">{formatDate(doc.created_at)}</span>
                     </div>
                   </div>
+
+                  <button
+                    onClick={() => handleDelete(doc.blob_id)}
+                    className="flex-shrink-0 rounded p-1 text-zinc-500 opacity-0 transition-opacity hover:bg-zinc-800 hover:text-red-400 group-hover:opacity-100"
+                    aria-label="Delete document"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
                 </div>
               ))}
             </div>
           )}
         </div>
       </div>
-    </div>
+    </AppShell>
   );
 }

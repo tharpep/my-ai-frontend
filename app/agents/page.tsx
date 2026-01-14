@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AppShell } from "@/components/layout/AppShell";
 import { Bot, Plus, Star, Play, Settings, Copy, Trash2, Edit2 } from "lucide-react";
 
 // Mock agent templates
@@ -60,8 +61,8 @@ export default function AgentsPage() {
     : agents.filter(a => a.category === selectedCategory);
 
   return (
-    <div className="h-full overflow-y-auto bg-zinc-950 p-6">
-      <div className="mx-auto max-w-7xl">
+    <AppShell maxWidth="7xl">
+      
         {/* Header */}
         <div className="mb-8 flex items-start justify-between">
           <div>
