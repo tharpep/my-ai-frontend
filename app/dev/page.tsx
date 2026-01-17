@@ -22,9 +22,6 @@ export default function DevPage() {
             <h1 className="text-2xl font-semibold tracking-tight text-zinc-900 dark:text-zinc-50">
               Dev Page
             </h1>
-            <p className="mt-2 text-zinc-600 dark:text-zinc-400">
-              Developer page for testing and development
-            </p>
           </div>
         </div>
 
